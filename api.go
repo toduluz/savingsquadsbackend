@@ -26,6 +26,7 @@ func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handle))
+	router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById))
 	//retrieve info from mongodb
 
 	//router.HandleFunc("/", makeHTTPHandleFunc(s.handleVoucher))
@@ -47,6 +48,7 @@ func (s *APIServer) Run() {
 
 func (s *APIServer) handle(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "POST" {
+		fmt.Println("Hello from handle POST /")
 		voucherId, err := createVoucher(w, r, s.store)
 		if err != nil {
 			return err
@@ -63,6 +65,26 @@ func (s *APIServer) handle(w http.ResponseWriter, r *http.Request) error {
 		return WriteJSON(w, http.StatusOK, vouchers)
 	}
 
+	return WriteJSON(w, http.StatusBadRequest, nil)
+}
+
+func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		fmt.Println("Hello from handle GET /voucher/{id}")
+		voucher, err := getVoucherById(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, voucher)
+	}
+	if r.Method == "DELETE" {
+		fmt.Println("Hello from handle DELETE /voucher/{id}")
+		err := deleteVoucherById(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, nil)
+	}
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 
