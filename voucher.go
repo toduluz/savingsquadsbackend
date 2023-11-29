@@ -74,19 +74,38 @@ func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 	return vouchers, nil
 }
 
-func updateVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
-	var temp primitive.ObjectID
+func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+
+	// find voucher
 	var voucher Voucher
-	temp, _ = primitive.ObjectIDFromHex("6566d3e1d3a38526715ab80e")
+	err := json.NewDecoder(r.Body).Decode(&voucher)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+
 	collection := client.Database("testMongo").Collection("Voucher")
 
-	_, err := collection.UpdateOne(context.Background(), bson.M{"_id": temp}, bson.M{"$set": bson.M{"isDeleted": true}})
+	err = collection.FindOne(context.Background(), bson.M{"_id": voucher.ID}).Decode(&voucher)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			http.Error(w, "No voucher found with given ID", http.StatusNotFound)
+			return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return nil, err
+	}
+	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"usageCount": voucher.UsageCount + 1}})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
+	if res.ModifiedCount == 0 {
+		http.Error(w, "No voucher found with given ID", http.StatusNotFound)
+		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
+	}
 
-	collection.FindOne(context.Background(), bson.M{"_id": temp}).Decode(&voucher)
+	fmt.Println("Voucher updated")
 	return &voucher, nil
 }
 
