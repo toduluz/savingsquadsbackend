@@ -41,19 +41,17 @@ func (s *APIServer) Run() {
 	// router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
 	// router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
 
-	log.Println("JSON API server running on port: ", s.listenAddr)
+	log.Println("JSON API server running on port", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
 }
 
 func (s *APIServer) handle(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "POST" {
-		fmt.Println("Hello from handle POST /")
-
-		voucher, err := createVoucher(w, r, s.store)
+		voucherId, err := createVoucher(w, r, s.store)
 		if err != nil {
-			return WriteJSON(w, http.StatusBadRequest, nil)
+			return err
 		}
-		return WriteJSON(w, http.StatusCreated, voucher)
+		return WriteJSON(w, http.StatusCreated, "id: "+voucherId)
 	}
 
 	if r.Method == "GET" {

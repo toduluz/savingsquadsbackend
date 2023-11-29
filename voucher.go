@@ -27,26 +27,24 @@ type Voucher struct {
 	IsDeleted      bool               `json:"isDeleted" bson:"isDeleted"`
 }
 
-func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
 	var voucher Voucher
 
 	err := json.NewDecoder(r.Body).Decode(&voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil, err
+		return "", err
 	}
 
 	collection := client.Database("testMongo").Collection("Voucher")
 	insertResult, err := collection.InsertOne(context.TODO(), voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil, err
+		return "", err
 	}
 
-	// Assign the InsertedID to the ID field of the Voucher
-	voucher.ID = insertResult.InsertedID.(primitive.ObjectID)
-
-	return &voucher, nil
+	// Convert the InsertedID to a string and return
+	return insertResult.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
 func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]Voucher, error) {
