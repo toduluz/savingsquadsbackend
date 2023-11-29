@@ -25,7 +25,7 @@ func NewAPIServer(listenAddr string, store *mongo.Client) *APIServer {
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handle))
+	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher))
 	router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById))
 	//retrieve info from mongodb
 
@@ -74,26 +74,6 @@ func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error 
 		return WriteJSON(w, http.StatusOK, voucher)
 	}
 
-	return WriteJSON(w, http.StatusBadRequest, nil)
-}
-
-func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) error {
-	if r.Method == "GET" {
-		fmt.Println("Hello from handle GET /voucher/{id}")
-		voucher, err := getVoucherById(w, r, s.store)
-		if err != nil {
-			return err
-		}
-		return WriteJSON(w, http.StatusOK, voucher)
-	}
-	if r.Method == "DELETE" {
-		fmt.Println("Hello from handle DELETE /voucher/{id}")
-		err := deleteVoucherById(w, r, s.store)
-		if err != nil {
-			return err
-		}
-		return WriteJSON(w, http.StatusOK, nil)
-	}
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 

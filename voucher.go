@@ -88,6 +88,8 @@ func updateVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 
 	collection.FindOne(context.Background(), bson.M{"_id": temp}).Decode(&voucher)
 	return &voucher, nil
+}
+
 func getVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (Voucher, error) {
 	collection := client.Database("testMongo").Collection("Voucher")
 
