@@ -25,7 +25,8 @@ func NewAPIServer(listenAddr string, store *mongo.Client) *APIServer {
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher))
+	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handle))
+	router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById))
 	//retrieve info from mongodb
 
 	//router.HandleFunc("/", makeHTTPHandleFunc(s.handleVoucher))
@@ -41,19 +42,18 @@ func (s *APIServer) Run() {
 	// router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
 	// router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
 
-	log.Println("JSON API server running on port: ", s.listenAddr)
+	log.Println("JSON API server running on port", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
 }
 
 func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "POST" {
 		fmt.Println("Hello from handle POST /")
-
-		voucher, err := createVoucher(w, r, s.store)
+		voucherId, err := createVoucher(w, r, s.store)
 		if err != nil {
-			return WriteJSON(w, http.StatusBadRequest, nil)
+			return err
 		}
-		return WriteJSON(w, http.StatusCreated, voucher)
+		return WriteJSON(w, http.StatusCreated, "id: "+voucherId)
 	}
 
 	if r.Method == "GET" {
@@ -74,6 +74,46 @@ func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error 
 		return WriteJSON(w, http.StatusOK, voucher)
 	}
 
+	return WriteJSON(w, http.StatusBadRequest, nil)
+}
+
+func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		fmt.Println("Hello from handle GET /voucher/{id}")
+		voucher, err := getVoucherById(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, voucher)
+	}
+	if r.Method == "DELETE" {
+		fmt.Println("Hello from handle DELETE /voucher/{id}")
+		err := deleteVoucherById(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, nil)
+	}
+	return WriteJSON(w, http.StatusBadRequest, nil)
+}
+
+func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		fmt.Println("Hello from handle GET /voucher/{id}")
+		voucher, err := getVoucherById(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, voucher)
+	}
+	if r.Method == "DELETE" {
+		fmt.Println("Hello from handle DELETE /voucher/{id}")
+		err := deleteVoucherById(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, nil)
+	}
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 

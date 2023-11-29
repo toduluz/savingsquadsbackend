@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,26 +30,24 @@ type Voucher struct {
 
 // update usageCount and IsDeleted
 
-func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
 	var voucher Voucher
 
 	err := json.NewDecoder(r.Body).Decode(&voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil, err
+		return "", err
 	}
 
 	collection := client.Database("testMongo").Collection("Voucher")
 	insertResult, err := collection.InsertOne(context.TODO(), voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil, err
+		return "", err
 	}
 
-	// Assign the InsertedID to the ID field of the Voucher
-	voucher.ID = insertResult.InsertedID.(primitive.ObjectID)
-
-	return &voucher, nil
+	// Convert the InsertedID to a string and return
+	return insertResult.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
 func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]Voucher, error) {
@@ -89,4 +88,41 @@ func updateVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 
 	collection.FindOne(context.Background(), bson.M{"_id": temp}).Decode(&voucher)
 	return &voucher, nil
+func getVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (Voucher, error) {
+	collection := client.Database("testMongo").Collection("Voucher")
+
+	vars := mux.Vars(r)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return Voucher{}, err
+	}
+
+	var voucher Voucher
+	err = collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&voucher)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return Voucher{}, err
+	}
+
+	return voucher, nil
+}
+
+func deleteVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) error {
+	collection := client.Database("testMongo").Collection("Voucher")
+
+	vars := mux.Vars(r)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return err
+	}
+
+	_, err = collection.DeleteOne(context.Background(), bson.M{"_id": id})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
+	}
+
+	return nil
 }
