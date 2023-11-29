@@ -27,6 +27,8 @@ type Voucher struct {
 	IsDeleted      bool               `json:"isDeleted" bson:"isDeleted"`
 }
 
+// update usageCount and IsDeleted
+
 func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
 	var voucher Voucher
 
@@ -71,4 +73,20 @@ func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 	fmt.Println(vouchers)
 
 	return vouchers, nil
+}
+
+func updateVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+	var temp primitive.ObjectID
+	var voucher Voucher
+	temp, _ = primitive.ObjectIDFromHex("6566d3e1d3a38526715ab80e")
+	collection := client.Database("testMongo").Collection("Voucher")
+
+	_, err := collection.UpdateOne(context.Background(), bson.M{"_id": temp}, bson.M{"$set": bson.M{"isDeleted": true}})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return nil, err
+	}
+
+	collection.FindOne(context.Background(), bson.M{"_id": temp}).Decode(&voucher)
+	return &voucher, nil
 }

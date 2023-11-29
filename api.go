@@ -25,7 +25,7 @@ func NewAPIServer(listenAddr string, store *mongo.Client) *APIServer {
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handle))
+	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher))
 	//retrieve info from mongodb
 
 	//router.HandleFunc("/", makeHTTPHandleFunc(s.handleVoucher))
@@ -45,7 +45,7 @@ func (s *APIServer) Run() {
 	http.ListenAndServe(s.listenAddr, router)
 }
 
-func (s *APIServer) handle(w http.ResponseWriter, r *http.Request) error {
+func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "POST" {
 		fmt.Println("Hello from handle POST /")
 
@@ -63,6 +63,15 @@ func (s *APIServer) handle(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		return WriteJSON(w, http.StatusOK, vouchers)
+	}
+
+	if r.Method == "PUT" {
+		fmt.Println("Hello from handle PUT /")
+		voucher, err := updateVoucher(w, r, s.store)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, voucher)
 	}
 
 	return WriteJSON(w, http.StatusBadRequest, nil)
