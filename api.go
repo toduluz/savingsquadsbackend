@@ -25,6 +25,7 @@ func NewAPIServer(listenAddr string, client *mongo.Client) *APIServer {
 
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
+	//	test := http.NewServeMux()
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher' 				GET 		getAllVoucher() 		- return all vouchers

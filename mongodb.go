@@ -3,16 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const uri = "mongodb+srv://panda:panda123@cluster0.cdnneln.mongodb.net/?retryWrites=true&w=majority"
-
 func connectMongoDB() (*mongo.Client, error) {
 	// Use the SetServerAPIOptions() method to set the Stable API version to 1
+	err := godotenv.Load()
+	if err != nil {
+		panic(err)
+	}
+
+	uri := os.Getenv("MONGODB_URI")
+	fmt.Println(uri)
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(uri).SetServerAPIOptions(serverAPI)
 
