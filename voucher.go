@@ -74,14 +74,8 @@ func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 	return vouchers, nil
 }
 
-func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
-
-	// find voucher
-	var voucher Voucher
-	temp := r.FormValue("query")
-	id, err := primitive.ObjectIDFromHex(temp)
-
-	//err := json.NewDecoder(r.Body).Decode(&voucher)
+func updateVoucherIsDeletedByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+	voucher, err := getVoucherById(w, r, client)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, err
@@ -89,17 +83,35 @@ func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mong
 
 	collection := client.Database("testMongo").Collection("Voucher")
 
-	//	err = collection.FindOne(context.Background(), bson.M{"_id": voucher.ID}).Decode(&voucher)
-	err = collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&voucher)
-
+	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"isDeleted": false}})
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			http.Error(w, "No voucher found with given ID", http.StatusNotFound)
-			return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
-		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
+	if res.ModifiedCount == 0 {
+		http.Error(w, "No updates", http.StatusNotFound)
+		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
+	}
+
+	fmt.Println("Voucher deleted (updated isDeleted field to true)")
+	return voucher, nil
+}
+
+// update usage count and check if usage limit is reached
+// if usage limit is reached, no more further vouchers can be used
+func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+
+	voucher, err := getVoucherById(w, r, client)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+	if voucher.UsageCount > voucher.UsageLimit {
+		fmt.Println("Usage limit reached")
+		return nil, err
+	}
+	collection := client.Database("testMongo").Collection("Voucher")
+
 	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"usageCount": voucher.UsageCount + 1}})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -110,8 +122,34 @@ func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mong
 		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
 	}
 
+	if voucher.UsageCount+1 > voucher.UsageLimit {
+		updateVoucherIsDeletedByID(w, r, client)
+	}
+	fmt.Println("Current usage count: ", voucher.UsageCount+1)
+	fmt.Println("Usage limit: ", voucher.UsageLimit)
 	fmt.Println("Voucher updated")
-	return &voucher, nil
+	return voucher, nil
+}
+
+func updateVoucherUsageLimitByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+	voucher, err := getVoucherById(w, r, client)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+
+	collection := client.Database("testMongo").Collection("Voucher")
+
+	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"usageLimit": voucher.UsageLimit + 10}})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return nil, err
+	}
+	if res.ModifiedCount == 0 {
+		http.Error(w, "No voucher found with given ID", http.StatusNotFound)
+		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
+	}
+	return voucher, nil
 }
 
 func getVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
