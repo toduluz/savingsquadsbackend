@@ -25,6 +25,7 @@ func NewAPIServer(listenAddr string, client *mongo.Client) *APIServer {
 
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
+	//	test := http.NewServeMux()
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher' 				GET 		getAllVoucher() 		- return all vouchers
@@ -43,7 +44,7 @@ func (s *APIServer) Run() {
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/usage' 	PUT		 	handleUpdateVoucher()	- update voucher (usageCount + 1)
-	router.HandleFunc("/voucher/{id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
+	router.HandleFunc("/voucher/?id={id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
 
 	// Endpoints				Method 		Function				Description
 	// '/user' 					GET 		getAllUser() 			- return all users
@@ -174,3 +175,6 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.WriteHeader(status)
 	return json.NewEncoder(w).Encode(v)
 }
+
+// do up PUT req in api
+// do up updateToDeleted  fun
