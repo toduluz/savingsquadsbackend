@@ -44,7 +44,7 @@ func (s *APIServer) Run() {
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/usage' 	PUT		 	handleUpdateVoucher()	- update voucher (usageCount + 1)
-	router.HandleFunc("/voucher/{id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
+	router.HandleFunc("/voucher/?id={id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
 
 	log.Println("JSON API server running on port:", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
@@ -132,3 +132,6 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.WriteHeader(status)
 	return json.NewEncoder(w).Encode(v)
 }
+
+// do up PUT req in api
+// do up updateToDeleted  fun

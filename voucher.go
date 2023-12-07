@@ -78,7 +78,10 @@ func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mong
 
 	// find voucher
 	var voucher Voucher
-	err := json.NewDecoder(r.Body).Decode(&voucher)
+	temp := r.FormValue("query")
+	id, err := primitive.ObjectIDFromHex(temp)
+
+	//err := json.NewDecoder(r.Body).Decode(&voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, err
@@ -86,7 +89,9 @@ func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mong
 
 	collection := client.Database("testMongo").Collection("Voucher")
 
-	err = collection.FindOne(context.Background(), bson.M{"_id": voucher.ID}).Decode(&voucher)
+	//	err = collection.FindOne(context.Background(), bson.M{"_id": voucher.ID}).Decode(&voucher)
+	err = collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&voucher)
+
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			http.Error(w, "No voucher found with given ID", http.StatusNotFound)
