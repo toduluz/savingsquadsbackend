@@ -46,8 +46,51 @@ func (s *APIServer) Run() {
 	// '/voucher/{id}/usage' 	PUT		 	handleUpdateVoucher()	- update voucher (usageCount + 1)
 	router.HandleFunc("/voucher/?id={id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
 
+	// Endpoints				Method 		Function				Description
+	// '/user' 					GET 		getAllUser() 			- return all users
+	//							POST 		createUser() 			- create new user
+	router.HandleFunc("/user", makeHTTPHandleFunc(s.handleUser))
+
+	// Endpoints				Method 		Function				Description
+	// '/user/{id}' 			GET 		getUserById() 			- return user by ID
+	router.HandleFunc("/user/{id}", makeHTTPHandleFunc(s.handleUserById))
+
 	log.Println("JSON API server running on port:", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
+}
+
+func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		fmt.Println("Hello from handleUser() GET /")
+		users, err := getAllUser(w, r, s.client)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, users)
+	}
+
+	if r.Method == "POST" {
+		fmt.Println("Hello from handleUser() POST /")
+		userId, err := createUser(w, r, s.client)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusCreated, "id: "+userId)
+	}
+
+	return WriteJSON(w, http.StatusBadRequest, nil)
+}
+
+func (s *APIServer) handleUserById(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		fmt.Println("Hello from handleUserById GET /user/{id}")
+		user, err := getUserById(w, r, s.client)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, user)
+	}
+	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 
 func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error {
@@ -92,14 +135,14 @@ func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) er
 		return WriteJSON(w, http.StatusOK, voucher)
 	}
 	// should be PUT to update voucher isDelete = True
-	if r.Method == "DELETE" {
-		fmt.Println("Hello from handleVoucherById DELETE /voucher/{id}")
-		err := deleteVoucherById(w, r, s.client)
-		if err != nil {
-			return err
-		}
-		return WriteJSON(w, http.StatusOK, nil)
-	}
+	// if r.Method == "DELETE" {
+	// 	fmt.Println("Hello from handleVoucherById DELETE /voucher/{id}")
+	// 	err := deleteVoucherById(w, r, s.client)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	return WriteJSON(w, http.StatusOK, nil)
+	// }
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 
