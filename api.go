@@ -30,21 +30,20 @@ func (s *APIServer) Run() {
 	// Endpoints				Method 		Function				Description
 	// '/voucher' 				GET 		getAllVoucher() 		- return all vouchers
 	//							POST 		createVoucher() 		- create new voucher
-	//							PUT	  		updateVoucherByID() 	- update voucher by ID xx
 	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher))
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}' 			GET 		getVoucherById() 		- return voucher by ID
-	//							DELETE		deleteVoucherById() 	- delete voucher by ID xx - to be updated
+	// 							PUT	  		updateVoucherByID() 	- update voucher to isDeleted by ID
 	router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById))
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/delete' 	PUT		 	handleUpdateVoucher()	- update voucher (isDeleted = true)
-	//router.HandleFunc("/voucher/{id}/delete", makeHTTPHandleFunc(s.handleDeleteVoucher)) // may not be required, tbc
+	//router.HandleFunc("/voucher/{id}/delete", makeHTTPHandleFunc(s.handleDeleteVoucher)) // commented out for now
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/usage' 	PUT		 	handleUpdateVoucher()	- update voucher (usageCount + 1)
-	router.HandleFunc("/voucher/?id={id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
+	router.HandleFunc("/voucher/{id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
 
 	// Endpoints				Method 		Function				Description
 	// '/user' 					GET 		getAllUser() 			- return all users
@@ -54,6 +53,10 @@ func (s *APIServer) Run() {
 	// Endpoints				Method 		Function				Description
 	// '/user/{id}' 			GET 		getUserById() 			- return user by ID
 	router.HandleFunc("/user/{id}", makeHTTPHandleFunc(s.handleUserById))
+
+	// Endpoints				Method 		Function				Description
+	// '/voucher/{id}/usageLimit' 	PUT		 	handleUpdateVoucher()	- update voucher limit (usageLimit + 10)
+	router.HandleFunc("/voucher/{id}/usageLimit", makeHTTPHandleFunc(s.handleVoucherUsageLimit))
 
 	log.Println("JSON API server running on port:", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
@@ -93,6 +96,12 @@ func (s *APIServer) handleUserById(w http.ResponseWriter, r *http.Request) error
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 
+// Endpoints				Method 		Function				Description
+// '/voucher' 				GET 		getAllVoucher() 		- return all vouchers
+//							POST 		createVoucher() 		- create new voucher
+//							PUT	  		updateVoucherByID() 	- update voucher by ID xx
+//router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher))
+
 func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		fmt.Println("Hello from handleVoucher() GET /")
@@ -111,20 +120,16 @@ func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error 
 		}
 		return WriteJSON(w, http.StatusCreated, "id: "+voucherId)
 	}
-
-	// if r.Method == "PUT" {
-	// 	fmt.Println("Hello from handle PUT /")
-	// 	voucher, err := updateVoucherByID(w, r, s.client)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return WriteJSON(w, http.StatusOK, voucher)
-	// }
-
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 
-// changes here
+// Endpoints				Method 		Function				Description
+// '/voucher/{id}' 			GET 		getVoucherById() 		- return voucher by ID
+//							PUT	  		updateVoucherByID() 	- update voucher by ID xx - to be updated
+//
+// router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById))
+
+// this function returns voucher by ID
 func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		fmt.Println("Hello from handleVoucherById GET /voucher/{id}")
@@ -143,13 +148,41 @@ func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) er
 	// 	}
 	// 	return WriteJSON(w, http.StatusOK, nil)
 	// }
+
+	// this updates the isDeleted field to true
+	// this stimulates the deletion of the voucher from the database
+
+	// ######## the returned voucher here is the voucher before the update ########
+	// ### take note ###
+	if r.Method == "PUT" {
+		fmt.Println("Hello from handleVoucherById PUT /voucher/{id} here")
+		voucher, err := updateVoucherIsDeletedByID(w, r, s.client)
+		if err != nil {
+			return err
+		}
+		fmt.Println("voucher is deleted")
+		return WriteJSON(w, http.StatusOK, voucher)
+	}
 	return WriteJSON(w, http.StatusBadRequest, nil)
 }
 
 func (s *APIServer) handleUpdateVoucherUsage(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "PUT" {
-		fmt.Println("Hello from handle PUT /voucher/{id}/delete")
+		fmt.Println("Hello from handle PUT /voucher/{id}/usage")
 		voucher, err := updateVoucherUsageByID(w, r, s.client)
+		if err != nil {
+			return err
+		}
+		return WriteJSON(w, http.StatusOK, voucher)
+	}
+
+	return WriteJSON(w, http.StatusBadRequest, nil)
+}
+
+func (s *APIServer) handleVoucherUsageLimit(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "PUT" {
+		fmt.Println("Hello from handle PUT /voucher/{id}/usageLimit")
+		voucher, err := updateVoucherUsageLimitByID(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -175,6 +208,3 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.WriteHeader(status)
 	return json.NewEncoder(w).Encode(v)
 }
-
-// do up PUT req in api
-// do up updateToDeleted  fun
