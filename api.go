@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -23,19 +25,49 @@ func NewAPIServer(listenAddr string, client *mongo.Client) *APIServer {
 	}
 }
 
+// simple logging that outputs to app.logs
+// to use this logging -> simply use log.Println()
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// Get the current date
+		currentTime := time.Now()
+
+		// Format the date as a string
+		dateString := currentTime.Format("20060102")
+
+		// Use the date string in the log file name
+		logFileName := "./logs/server_" + dateString + ".logs"
+		logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer logFile.Close()
+
+		// Set the output of the log package to the file
+		log.SetOutput(logFile)
+		// Do stuff here
+		log.SetPrefix("TRACE: ")
+		log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
+		// Call the next handler, which can be another middleware in the chain, or the final handler.
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
+	router.Use(loggingMiddleware)
 	//	test := http.NewServeMux()
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher' 				GET 		getAllVoucher() 		- return all vouchers
 	//							POST 		createVoucher() 		- create new voucher
-	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher))
+	router.HandleFunc("/voucher", makeHTTPHandleFunc(s.handleVoucher)).Methods(http.MethodGet, http.MethodPost)
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}' 			GET 		getVoucherById() 		- return voucher by ID
 	// 							PUT	  		updateVoucherByID() 	- update voucher to isDeleted by ID
-	router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById))
+	router.HandleFunc("/voucher/{id}", makeHTTPHandleFunc(s.handleVoucherById)).Methods(http.MethodGet, http.MethodPut)
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/delete' 	PUT		 	handleUpdateVoucher()	- update voucher (isDeleted = true)
@@ -43,20 +75,20 @@ func (s *APIServer) Run() {
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/usage' 	PUT		 	handleUpdateVoucher()	- update voucher (usageCount + 1)
-	router.HandleFunc("/voucher/{id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage))
+	router.HandleFunc("/voucher/{id}/usage", makeHTTPHandleFunc(s.handleUpdateVoucherUsage)).Methods(http.MethodPut)
 
 	// Endpoints				Method 		Function				Description
 	// '/user' 					GET 		getAllUser() 			- return all users
 	//							POST 		createUser() 			- create new user
-	router.HandleFunc("/user", makeHTTPHandleFunc(s.handleUser))
+	router.HandleFunc("/user", makeHTTPHandleFunc(s.handleUser)).Methods(http.MethodGet, http.MethodPost)
 
 	// Endpoints				Method 		Function				Description
 	// '/user/{id}' 			GET 		getUserById() 			- return user by ID
-	router.HandleFunc("/user/{id}", makeHTTPHandleFunc(s.handleUserById))
+	router.HandleFunc("/user/{id}", makeHTTPHandleFunc(s.handleUserById)).Methods(http.MethodGet)
 
 	// Endpoints				Method 		Function				Description
 	// '/voucher/{id}/usageLimit' 	PUT		 	handleUpdateVoucher()	- update voucher limit (usageLimit + 10)
-	router.HandleFunc("/voucher/{id}/usageLimit", makeHTTPHandleFunc(s.handleVoucherUsageLimit))
+	router.HandleFunc("/voucher/{id}/usageLimit", makeHTTPHandleFunc(s.handleVoucherUsageLimit)).Methods(http.MethodPut)
 
 	log.Println("JSON API server running on port:", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
@@ -64,6 +96,7 @@ func (s *APIServer) Run() {
 
 func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
+		log.Println("Hehe")
 		fmt.Println("Hello from handleUser() GET /")
 		users, err := getAllUser(w, r, s.client)
 		if err != nil {
@@ -104,7 +137,7 @@ func (s *APIServer) handleUserById(w http.ResponseWriter, r *http.Request) error
 
 func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
-		fmt.Println("Hello from handleVoucher() GET /")
+		log.Println("Hello from handleVoucher() GET /")
 		vouchers, err := getAllVoucher(w, r, s.client)
 		if err != nil {
 			return err

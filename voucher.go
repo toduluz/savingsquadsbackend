@@ -69,7 +69,7 @@ func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
-	fmt.Println(vouchers)
+	//fmt.Println(vouchers)
 
 	return vouchers, nil
 }
