@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/toduluz/savingsquadsbackend/internal/data"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -102,7 +103,7 @@ func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		log.Println("Hehe")
 		fmt.Println("Hello from handleUser() GET /")
-		users, err := getAllUser(w, r, s.client)
+		users, err := data.GetAllUser(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -111,7 +112,7 @@ func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
 
 	if r.Method == "POST" {
 		fmt.Println("Hello from handleUser() POST /")
-		userId, err := createUser(w, r, s.client)
+		userId, err := data.CreateUser(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -124,7 +125,7 @@ func (s *APIServer) handleUser(w http.ResponseWriter, r *http.Request) error {
 func (s *APIServer) handleUserById(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		fmt.Println("Hello from handleUserById GET /user/{id}")
-		user, err := getUserById(w, r, s.client)
+		user, err := data.GetUserById(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -142,7 +143,7 @@ func (s *APIServer) handleUserById(w http.ResponseWriter, r *http.Request) error
 func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		log.Println("Hello from handleVoucher() GET /")
-		vouchers, err := getAllVoucher(w, r, s.client)
+		vouchers, err := data.GetAllVoucher(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -151,7 +152,7 @@ func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error 
 
 	if r.Method == "POST" {
 		fmt.Println("Hello from handleVoucher() POST /")
-		voucherId, err := createVoucher(w, r, s.client)
+		voucherId, err := data.CreateVoucher(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -170,7 +171,7 @@ func (s *APIServer) handleVoucher(w http.ResponseWriter, r *http.Request) error 
 func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		fmt.Println("Hello from handleVoucherById GET /voucher/{id}")
-		voucher, err := getVoucherById(w, r, s.client)
+		voucher, err := data.GetVoucherById(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -193,7 +194,7 @@ func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) er
 	// ### take note ###
 	if r.Method == "PUT" {
 		fmt.Println("Hello from handleVoucherById PUT /voucher/{id} here")
-		voucher, err := updateVoucherIsDeletedByID(w, r, s.client)
+		voucher, err := data.UpdateVoucherIsDeletedByID(w, r, s.client)
 		if err != nil {
 			return err
 		}
@@ -206,7 +207,7 @@ func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) er
 func (s *APIServer) handleUpdateVoucherUsage(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "PUT" {
 		log.Println("Handling voucher usage +1 ...")
-		voucher, err := updateVoucherUsageByID(w, r, s.client)
+		voucher, err := data.UpdateVoucherUsageByID(w, r, s.client)
 		if err != nil {
 			log.Println("Error in updating voucher usage ...")
 			return WriteJSON(w, http.StatusForbidden, err)
@@ -221,7 +222,7 @@ func (s *APIServer) handleUpdateVoucherUsage(w http.ResponseWriter, r *http.Requ
 func (s *APIServer) handleVoucherUsageLimit(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "PUT" {
 		fmt.Println("Hello from handle PUT /voucher/{id}/usageLimit")
-		voucher, err := updateVoucherUsageLimitByID(w, r, s.client)
+		voucher, err := data.UpdateVoucherUsageLimitByID(w, r, s.client)
 		if err != nil {
 			return err
 		}

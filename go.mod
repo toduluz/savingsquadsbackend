@@ -1,4 +1,4 @@
-module github.com/toduluz/savingsquadsbackend.git
+module github.com/toduluz/savingsquadsbackend
 
 go 1.21.3
 

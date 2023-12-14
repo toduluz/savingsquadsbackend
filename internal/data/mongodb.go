@@ -1,4 +1,4 @@
-package main
+package data
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func connectMongoDB() (*mongo.Client, error) {
+func ConnectMongoDB() (*mongo.Client, error) {
 	// Use the SetServerAPIOptions() method to set the Stable API version to 1
 	err := godotenv.Load()
 	if err != nil {

@@ -1,4 +1,4 @@
-package main
+package data
 
 import (
 	"context"
@@ -36,7 +36,7 @@ type Voucher struct {
 }
 
 // creating brand new voucher POST method
-func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
+func CreateVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
 	var voucher Voucher
 
 	err := json.NewDecoder(r.Body).Decode(&voucher)
@@ -57,7 +57,7 @@ func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 }
 
 // retrieves all vouchers GET method
-func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]Voucher, error) {
+func GetAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]Voucher, error) {
 	log.Println("Retrieving all vouchers...")
 	collection := client.Database(db).Collection(voucherCollection)
 	cursor, err := collection.Find(context.TODO(), bson.M{})
@@ -82,7 +82,7 @@ func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 }
 
 // update Voucher isDeleted field to true PUT method
-func updateVoucherIsDeletedByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+func UpdateVoucherIsDeletedByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
 
 	var voucher *Voucher
 	vars := mux.Vars(r)
@@ -107,7 +107,7 @@ func updateVoucherIsDeletedByID(w http.ResponseWriter, r *http.Request, client *
 
 // update usage count and check if usage limit is reached
 // if usage limit is reached, no more further vouchers can be used
-func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+func UpdateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
 	log.Println("In updateVoucherUsageByID")
 	vars := mux.Vars(r)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
@@ -139,7 +139,7 @@ func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mong
 	log.Println("Current usage count here: ", voucher.UsageCount+1)
 
 	if voucher.UsageCount+1 >= voucher.UsageLimit {
-		updateVoucherIsDeletedByID(w, r, client)
+		UpdateVoucherIsDeletedByID(w, r, client)
 	}
 	log.Println("Current usage count: ", voucher.UsageCount+1)
 	log.Println("Usage limit: ", voucher.UsageLimit)
@@ -148,7 +148,7 @@ func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mong
 }
 
 // updates voucher limit by 10
-func updateVoucherUsageLimitByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+func UpdateVoucherUsageLimitByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
 	// voucher, err := getVoucherById(w, r, client)
 	// if err != nil {
 	// 	http.Error(w, err.Error(), http.StatusBadRequest)
@@ -175,7 +175,7 @@ func updateVoucherUsageLimitByID(w http.ResponseWriter, r *http.Request, client 
 }
 
 // returns 1 voucher filtered using ID
-func getVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
+func GetVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
 	vars := mux.Vars(r)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {

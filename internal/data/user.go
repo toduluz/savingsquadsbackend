@@ -1,4 +1,4 @@
-package main
+package data
 
 import (
 	"context"
@@ -24,7 +24,7 @@ type User struct {
 	Vouchers []string          `json:"vouchers" bson:"vouchers"`
 }
 
-func createUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
+func CreateUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
 	var user User
 
 	err := json.NewDecoder(r.Body).Decode(&user)
@@ -44,7 +44,7 @@ func createUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) (s
 	return insertResult.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
-func getAllUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]User, error) {
+func GetAllUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]User, error) {
 	collection := client.Database("testMongo").Collection("User")
 
 	cursor, err := collection.Find(context.TODO(), bson.M{})
@@ -64,7 +64,7 @@ func getAllUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([
 	return users, nil
 }
 
-func getUserById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*User, error) {
+func GetUserById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*User, error) {
 
 	// get id from url
 	vars := mux.Vars(r)

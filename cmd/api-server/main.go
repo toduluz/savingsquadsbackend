@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log"
+
+	"github.com/toduluz/savingsquadsbackend/internal/data"
 )
 
 func main() {
 
 	// establish connection with MongoDB
-	client, err := connectMongoDB()
+	client, err := data.ConnectMongoDB()
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
