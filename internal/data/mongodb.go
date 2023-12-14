@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -36,7 +35,10 @@ func ConnectMongoDB() (*mongo.Client, error) {
 	// }()
 
 	// Send a ping to confirm a successful connection
-	if err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Err(); err != nil {
+	// if err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Err(); err != nil {
+	// 	panic(err)
+	// }
+	if err := client.Ping(context.TODO(), nil); err != nil {
 		panic(err)
 	}
 	// ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
