@@ -3,13 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+const (
+	db                = "testMongo"
+	voucherCollection = "Voucher"
 )
 
 // Voucher struct
@@ -28,8 +35,7 @@ type Voucher struct {
 	IsDeleted      bool               `json:"isDeleted" bson:"isDeleted"`
 }
 
-// update usageCount and IsDeleted
-
+// creating brand new voucher POST method
 func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) (string, error) {
 	var voucher Voucher
 
@@ -39,20 +45,21 @@ func createVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 		return "", err
 	}
 
-	collection := client.Database("testMongo").Collection("Voucher")
+	collection := client.Database(db).Collection(voucherCollection)
 	insertResult, err := collection.InsertOne(context.TODO(), voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return "", err
 	}
-
+	log.Println("Inserted a single document: ", insertResult.InsertedID, "New vouchers created")
 	// Convert the InsertedID to a string and return
 	return insertResult.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
+// retrieves all vouchers GET method
 func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client) ([]Voucher, error) {
-	collection := client.Database("testMongo").Collection("Voucher")
-
+	log.Println("Retrieving all vouchers...")
+	collection := client.Database(db).Collection(voucherCollection)
 	cursor, err := collection.Find(context.TODO(), bson.M{})
 
 	if err != nil {
@@ -62,96 +69,112 @@ func getAllVoucher(w http.ResponseWriter, r *http.Request, client *mongo.Client)
 	}
 	defer cursor.Close(context.Background())
 
-	fmt.Println("Vouchers found")
+	log.Println("Retrieved all vouchers")
 
 	var vouchers []Voucher
 	if err = cursor.All(context.Background(), &vouchers); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
-	//fmt.Println(vouchers)
+	log.Println("Returning all vouchers...")
 
 	return vouchers, nil
 }
 
+// update Voucher isDeleted field to true PUT method
 func updateVoucherIsDeletedByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
-	voucher, err := getVoucherById(w, r, client)
+
+	var voucher *Voucher
+	vars := mux.Vars(r)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	log.Println("ID retrieved...")
 	if err != nil {
+		log.Println("Error in getting ID")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, err
 	}
-
-	collection := client.Database("testMongo").Collection("Voucher")
-
-	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"isDeleted": false}})
+	collection := client.Database(db).Collection(voucherCollection)
+	err = collection.FindOneAndUpdate(context.Background(), bson.M{"_id": id}, bson.M{"$set": bson.M{"isDeleted": true}}).Decode(&voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Println("Error in updating voucher isDeleted field")
 		return nil, err
 	}
-	if res.ModifiedCount == 0 {
-		http.Error(w, "No updates", http.StatusNotFound)
-		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
-	}
 
-	fmt.Println("Voucher deleted (updated isDeleted field to true)")
+	log.Println("Voucher deleted (updated isDeleted field to true)")
 	return voucher, nil
 }
 
 // update usage count and check if usage limit is reached
 // if usage limit is reached, no more further vouchers can be used
 func updateVoucherUsageByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
-
-	voucher, err := getVoucherById(w, r, client)
+	log.Println("In updateVoucherUsageByID")
+	vars := mux.Vars(r)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	log.Println("ID retrieved...")
 	if err != nil {
+		log.Println("Error in getting ID")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, err
 	}
-	if voucher.UsageCount > voucher.UsageLimit {
-		fmt.Println("Usage limit reached")
-		return nil, err
-	}
-	collection := client.Database("testMongo").Collection("Voucher")
 
-	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"usageCount": voucher.UsageCount + 1}})
+	var voucher *Voucher
+	collection := client.Database(db).Collection(voucherCollection)
+
+	filter := bson.M{"_id": id, "$expr": bson.M{"$lt": bson.A{"$usageCount", "$usageLimit"}}}
+	update := bson.M{
+		"$inc": bson.M{"usageCount": 1},
+	}
+	err = collection.FindOneAndUpdate(context.Background(), filter, update).Decode(&voucher)
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil, err
+		if err == mongo.ErrNoDocuments {
+			log.Println("No document found based on current filters")
+			return nil, errors.New("no voucher found with given ID")
+		} else {
+			log.Println("Error in updating voucher usage")
+		}
 	}
-	if res.ModifiedCount == 0 {
-		http.Error(w, "No voucher found with given ID", http.StatusNotFound)
-		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
-	}
+	log.Println("Voucher updated", voucher)
+	log.Println("Current usage count here: ", voucher.UsageCount+1)
 
-	if voucher.UsageCount+1 > voucher.UsageLimit {
+	if voucher.UsageCount+1 >= voucher.UsageLimit {
 		updateVoucherIsDeletedByID(w, r, client)
 	}
-	fmt.Println("Current usage count: ", voucher.UsageCount+1)
-	fmt.Println("Usage limit: ", voucher.UsageLimit)
-	fmt.Println("Voucher updated")
+	log.Println("Current usage count: ", voucher.UsageCount+1)
+	log.Println("Usage limit: ", voucher.UsageLimit)
+	log.Println("Voucher updated")
 	return voucher, nil
 }
 
+// updates voucher limit by 10
 func updateVoucherUsageLimitByID(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
-	voucher, err := getVoucherById(w, r, client)
+	// voucher, err := getVoucherById(w, r, client)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusBadRequest)
+	// 	return nil, err
+	// }
+	var voucher *Voucher
+	vars := mux.Vars(r)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	log.Println("ID retrieved...")
 	if err != nil {
+		log.Println("Error in getting ID")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, err
 	}
+	collection := client.Database(db).Collection(voucherCollection)
 
-	collection := client.Database("testMongo").Collection("Voucher")
-
-	res, err := collection.UpdateOne(context.Background(), bson.M{"_id": voucher.ID}, bson.M{"$set": bson.M{"usageLimit": voucher.UsageLimit + 10}})
+	err = collection.FindOneAndUpdate(context.Background(), bson.M{"_id": id}, bson.M{"$inc": bson.M{"usageLimit": 10}}).Decode(&voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
-	if res.ModifiedCount == 0 {
-		http.Error(w, "No voucher found with given ID", http.StatusNotFound)
-		return nil, fmt.Errorf("no voucher found with ID: %v", voucher.ID)
-	}
+	log.Println("Voucher usage limit updated. Current limit: ", voucher.UsageLimit+10)
 	return voucher, nil
 }
 
+// returns 1 voucher filtered using ID
 func getVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) (*Voucher, error) {
 	vars := mux.Vars(r)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
@@ -161,18 +184,17 @@ func getVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client
 	}
 
 	var voucher Voucher
-	collection := client.Database("testMongo").Collection("Voucher")
+	collection := client.Database(db).Collection(voucherCollection)
 	err = collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&voucher)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
-
 	return &voucher, nil
 }
 
 // func deleteVoucherById(w http.ResponseWriter, r *http.Request, client *mongo.Client) error {
-// 	collection := client.Database("testMongo").Collection("Voucher")
+// 	collection := client.Database(db).Collection(voucherCollection)
 
 // 	vars := mux.Vars(r)
 // 	id, err := primitive.ObjectIDFromHex(vars["id"])

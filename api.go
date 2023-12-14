@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -44,9 +45,12 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		}
 		defer logFile.Close()
 
-		// Set the output of the log package to the file
-		log.SetOutput(logFile)
-		// Do stuff here
+		// print in terminal and write to logs
+		multi := io.MultiWriter(logFile, os.Stdout)
+		log.SetOutput(multi)
+
+		// write only in logs, does not appear terminal
+		// log.SetOutput(logFile)
 		log.SetPrefix("TRACE: ")
 		log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
 		// Call the next handler, which can be another middleware in the chain, or the final handler.
@@ -201,11 +205,13 @@ func (s *APIServer) handleVoucherById(w http.ResponseWriter, r *http.Request) er
 
 func (s *APIServer) handleUpdateVoucherUsage(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "PUT" {
-		fmt.Println("Hello from handle PUT /voucher/{id}/usage")
+		log.Println("Handling voucher usage +1 ...")
 		voucher, err := updateVoucherUsageByID(w, r, s.client)
 		if err != nil {
-			return err
+			log.Println("Error in updating voucher usage ...")
+			return WriteJSON(w, http.StatusForbidden, err)
 		}
+		log.Println("Voucher usage updated ...")
 		return WriteJSON(w, http.StatusOK, voucher)
 	}
 
