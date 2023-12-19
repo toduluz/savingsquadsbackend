@@ -14,7 +14,7 @@ import (
 )
 
 type Voucher struct {
-	Code         string    `json:"code" bson:"_id"`
+	Code         string    `json:"id" bson:"_id"`
 	CreatedAt    time.Time `json:"-" bson:"created_at"`
 	ModifiedAt   time.Time `json:"-" bson:"updated_at"`
 	Description  string    `json:"description" bson:"description"`
@@ -25,7 +25,7 @@ type Voucher struct {
 	Active       bool      `json:"active" bson:"active"`
 	UsageLimit   int       `json:"usageLimit" bson:"usageLimit"`
 	UsageCount   int       `json:"usageCount" bson:"usageCount"`
-	MinSpend     int       `json:"minSpend,omitempty" bson:"minSpend"`
+	MinSpend     int       `json:"minSpend" bson:"minSpend"`
 	Category     string    `json:"category" bson:"category"`
 }
 
@@ -154,7 +154,7 @@ func (m VoucherModel) Delete(code string) error {
 	return nil
 }
 
-func (m *VoucherModel) GetAllVouchers(code *string, starts *time.Time, expires *time.Time, active *bool, minSpend *int, category *string, f *Filters) ([]*Voucher, Metadata, error) {
+func (m *VoucherModel) GetAllVouchers(code string, starts time.Time, expires time.Time, active bool, minSpend int, category string, f *Filters) ([]*Voucher, Metadata, error) {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -164,23 +164,23 @@ func (m *VoucherModel) GetAllVouchers(code *string, starts *time.Time, expires *
 
 	// Build a filter based on the provided parameters.
 	filter := bson.D{}
-	if code != nil {
-		filter = append(filter, bson.E{"code", *code})
+	if code != "" {
+		filter = append(filter, bson.E{"_id", code})
 	}
-	if starts != nil {
-		filter = append(filter, bson.E{"start", bson.M{"$gte": *starts}})
+	if !starts.IsZero() {
+		filter = append(filter, bson.E{"start", bson.M{"$gte": starts}})
 	}
-	if expires != nil {
-		filter = append(filter, bson.E{"expires", bson.M{"$lte": *expires}})
+	if !expires.IsZero() {
+		filter = append(filter, bson.E{"expires", bson.M{"$lte": expires}})
 	}
-	if active != nil {
-		filter = append(filter, bson.E{"active", *active})
+	if active {
+		filter = append(filter, bson.E{"active", active})
 	}
-	if category != nil {
-		filter = append(filter, bson.E{"category", *category})
+	if category != "" {
+		filter = append(filter, bson.E{"category", category})
 	}
-	if minSpend != nil {
-		filter = append(filter, bson.E{"minSpend", bson.M{"$lte": *minSpend}})
+	if minSpend != 0 {
+		filter = append(filter, bson.E{"minSpend", bson.M{"$lte": minSpend}})
 	}
 
 	// If a cursor is provided, add a condition to the filter to only find documents with an _id greater than the cursor.
@@ -191,9 +191,8 @@ func (m *VoucherModel) GetAllVouchers(code *string, starts *time.Time, expires *
 		}
 		filter = append(filter, bson.E{"_id", bson.M{"$gt": cursorID}})
 	}
-
 	// Execute the MongoDB find operation with limit and sort.
-	opts := options.Find().SetLimit(int64(f.limit())).SetSort(bson.D{{f.Sort, sortDirection}})
+	opts := options.Find().SetLimit(int64(f.limit())).SetSort(bson.D{{f.sortColumn(), sortDirection}})
 	cursor, err := m.DB.Collection("vouchers").Find(ctx, filter, opts)
 	if err != nil {
 		return nil, Metadata{}, err

@@ -34,7 +34,6 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Name:      input.Name,
 		Email:     input.Email,
 		Vouchers:  []data.Voucher{},
-		Activated: false,
 		Points:    0,
 		Version:   1,
 	}
@@ -72,105 +71,10 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// After the user record has been created in the database, generate a new activation
-	// token for the user.
-	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
-
-	// Launch a goroutine which runs an anonymous function that sends the welcome email using
-	// the background helper function.
-	app.background(func() {
-		// Create map to act as a 'holding structure' for the data we send to the weclome email
-		// template.
-		data := map[string]interface{}{
-			"activationToken": token.Plaintext,
-			"userID":          user.ID,
-		}
-
-		// Call the Send() method on our Mailer, passing in the user's email address, name of the
-		// template file, and the data map containing the activationToken and the user's ID.
-		err = app.mailer.Send(user.Email, "user_welcome.tmpl", data)
-		if err != nil {
-			// Importantly, if there is an error sending the email then we log the error
-			// instead of raising a server error like before when we handled
-			// the email send functionality without a goroutine
-			app.logger.PrintError(err, nil)
-		}
-	})
-
 	// Note that we also change this to send the client a 202 Accepted status code which
 	// indicates that the request has been accepted for processing, but the processing has
 	// not been completed.
 	err = app.writeJSON(w, http.StatusAccepted, envelope{"user": user}, nil)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-	}
-}
-
-// activateUserHandler activates a user by setting 'activation = true' using the provided
-// activation token in the request body.
-func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse the plaintext activation token from the request body
-	var input struct {
-		TokenPlaintext string `json:"token"`
-	}
-
-	err := app.readJSON(w, r, &input)
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
-
-	// Validate the plaintext token provided by the client.
-	v := validator.New()
-
-	if data.ValidateTokenPlaintext(v, input.TokenPlaintext); !v.Valid() {
-		app.failedValidationResponse(w, r, v.Errors)
-		return
-	}
-
-	// Retrieve the details of the user associated with the token using the GetForToken() method.
-	// If no matching record is found, then we let the client know that the token they provided
-	// is not valid.
-	user, err := app.models.Users.GetForToken(data.ScopeActivation, input.TokenPlaintext)
-	if err != nil {
-		switch {
-		case errors.Is(err, data.ErrRecordNotFound):
-			v.AddError("token", "invalid or expired activation token")
-			app.failedValidationResponse(w, r, v.Errors)
-		default:
-			app.serverErrorResponse(w, r, err)
-		}
-		return
-	}
-
-	// Update the user's activation status.
-	user.Activated = true
-
-	// Save the updated user record in our database, checking for any edit conflicts in the same
-	// way that we did for our move records.
-	err = app.models.Users.Update(user)
-	if err != nil {
-		switch {
-		case errors.Is(err, data.ErrEditConflict):
-			app.editConflictResponse(w, r)
-		default:
-			app.serverErrorResponse(w, r, err)
-		}
-		return
-	}
-
-	// If everything went successfully above, then delete all activation tokens for the user.
-	err = app.models.Tokens.DeleteAllForUser(data.ScopeActivation, user.ID)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
-
-	err = app.writeJSON(w, http.StatusOK, envelope{"user": user}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

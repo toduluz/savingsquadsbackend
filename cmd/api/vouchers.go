@@ -35,7 +35,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 	// request body (not that the field names and types in the struct are a subset of the Movie
 	// struct). This struct will be our *target decode destination*.
 	var input struct {
-		Code         string    `json:"code"`
+		Code         string    `json:"id"`
 		Description  string    `json:"description"`
 		Discount     int       `json:"discount"`
 		IsPercentage bool      `json:"isPercentage"`
@@ -227,10 +227,11 @@ func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Reque
 	input.Code = app.readStrings(qs, "code", "")
 	input.Starts = app.readTime(qs, "starts", time.Time{})
 	input.Expires = app.readTime(qs, "expires", time.Time{})
-	input.Active = app.readBool(qs, "active", true)
+	input.Active = app.readBool(qs, "active", false)
 	input.MinSpend = app.readInt(qs, "minSpend", 0, v)
 	input.Category = app.readStrings(qs, "category", "")
 
+	input.Filters.Cursor = app.readStrings(qs, "cursor", "")
 	// Ge the page and page_size query string value as integers. Notice that we set the default
 	// page value to 1 and default page_size to 20, and that we pass the validator instance
 	// as the final argument.
@@ -239,16 +240,13 @@ func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Reque
 	// Extract the sort query string value, falling back to "id" if it is not provided
 	// by the client (which will imply an ascending sort on movie ID).
 	input.Filters.Sort = app.readStrings(qs, "sort", "_id")
-	if input.Filters.Sort == "code" {
-		input.Filters.Sort = "_id"
-	}
 
 	// Add the supported sort value for this endpoint to the sort safelist.
 	input.Filters.SortSafeList = []string{
 		// ascending sort values
-		"code", "starts", "expires", "active", "minSpend", "category",
+		"_id", "starts", "expires", "active", "minSpend", "category",
 		// descending sort values
-		"-code", "-starts", "-expires", "-active", "-minSpend", "-category",
+		"-_id", "-starts", "-expires", "-active", "-minSpend", "-category",
 	}
 
 	// Execute the validation checks on the Filters struct and send a response
@@ -260,7 +258,7 @@ func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Reque
 
 	// Call the MovieModel.GetAll method to retrieve the movies, passing in the various filter
 	// parameters.
-	vouchers, metadata, err := app.models.Vouchers.GetAllVouchers(&input.Code, &input.Starts, &input.Expires, &input.Active, &input.MinSpend, &input.Category, &input.Filters)
+	vouchers, metadata, err := app.models.Vouchers.GetAllVouchers(input.Code, input.Starts, input.Expires, input.Active, input.MinSpend, input.Category, &input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

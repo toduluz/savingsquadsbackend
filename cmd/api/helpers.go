@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/gorilla/mux"
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 )
 
@@ -21,9 +21,11 @@ type envelope map[string]interface{}
 // readIDParam reads interpolated "id" from request URL and returns it and nil. If there is an error
 // it returns and 0 and an error.
 func (app *application) readIDParam(r *http.Request) string {
-	params := httprouter.ParamsFromContext(r.Context())
+	// params := httprouter.ParamsFromContext(r.Context())
 
-	param := params.ByName("id")
+	// param := params.ByName("id")
+	vars := mux.Vars(r)
+	param := vars["id"]
 
 	return param
 }

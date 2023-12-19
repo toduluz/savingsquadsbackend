@@ -32,7 +32,6 @@ type User struct {
 	Password  password           `json:"-" bson:"password_hash"`
 	Addresses []Address          `json:"addresses" bson:"addresses"`
 	Phone     int                `json:"phone" bson:"phone"`
-	Activated bool               `json:"activated" bson:"activated"`
 	Vouchers  []Voucher          `json:"vouchers" bson:"vouchers"`
 	Points    int                `json:"points" bson:"points"`
 	Version   int                `json:"version" bson:"version"`
@@ -130,6 +129,33 @@ func (m UserModel) Insert(user *User) error {
 	return nil
 }
 
+func (m UserModel) Get(id primitive.ObjectID) (*User, error) {
+	// Create a context with a 3-second timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Define a User struct to hold the data returned by the query.
+	var user User
+
+	// Define the filter to match documents where id is id.
+	filter := bson.M{"_id": id}
+
+	// Execute the find operation
+	err := m.DB.Collection("users").FindOne(ctx, filter).Decode(&user)
+	if err != nil {
+		// If the error is a NoDocument error, return ErrRecordNotFound
+		switch {
+		case err == mongo.ErrNoDocuments:
+			return nil, ErrRecordNotFound
+		default:
+			// Otherwise, return the error
+			return nil, err
+		}
+	}
+
+	return &user, nil
+}
+
 // GetByEmail retrieves the User details from the database based on the user's email address.
 // Because we have a UNIQUE constraint on the email column, this query will only return one record,
 // or none at all, upon which we return a ErrRecordNotFound error).
@@ -181,7 +207,6 @@ func (m UserModel) Update(user *User) error {
 		"$set": bson.M{
 			"name":       user.Name,
 			"email":      user.Email,
-			"activated":  user.Activated,
 			"vouchers":   user.Vouchers,
 			"points":     user.Points,
 			"updated_at": time.Now(),
@@ -194,7 +219,7 @@ func (m UserModel) Update(user *User) error {
 	}
 
 	// Check if the email, password, activated, or role has changed.
-	if isChangePassword || user.Activated != currentUser.Activated {
+	if isChangePassword {
 		update["$inc"] = bson.M{"version": 1} // increment the version
 	}
 

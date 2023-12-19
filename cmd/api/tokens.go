@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/pascaldekloe/jwt" //
@@ -51,12 +50,12 @@ func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 	// time of now and validity window of the next 24 hours. We also set the issuer and
 	// audience to a unique identifier for our application.
 	var claims jwt.Claims
-	claims.Subject = strconv.FormatInt(user.ID, 10)
+	claims.Subject = user.ID.Hex()
 	claims.Issued = jwt.NewNumericTime(time.Now())
 	claims.NotBefore = jwt.NewNumericTime(time.Now())
 	claims.Expires = jwt.NewNumericTime(time.Now().Add(24 * time.Hour))
-	claims.Issuer = "greenlight.alexedwards.net"
-	claims.Audiences = []string{"greenlight.alexedwards.net"}
+	// claims.Issuer = "greenlight.alexedwards.net"
+	// claims.Audiences = []string{"greenlight.alexedwards.net"}
 	claims.Set = map[string]interface{}{"version": user.Version}
 	// Sign the JWT claims using the HMAC-SHA256 algorithm and the secret key from the
 	// application config. This returns a []byte slice containing the JWT as a base64-
