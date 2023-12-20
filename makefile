@@ -2,7 +2,7 @@ IMAGE_NAME := savingsquadsbackend
 CONTAINER_NAME := savingsquadsbackend-container
 
 build:
-	@go build -o bin/$(IMAGE_NAME) ./cmd/api-server
+	@go build -o bin/$(IMAGE_NAME) ./cmd/api
 
 run: build
 	./bin/$(IMAGE_NAME)

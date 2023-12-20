@@ -65,7 +65,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 		input.Code = code
 	}
 
-	// Copy the values from the input struct to a new Movie struct.
+	// Copy the values from the input struct to a new Voucher struct.
 	voucher := &data.Voucher{
 		Code:         input.Code,
 		CreatedAt:    time.Now(),
@@ -85,15 +85,15 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 	// Initialize a new Validator instance.
 	v := validator.New()
 
-	// Call the ValidateMovie() function and return a response containing the errors if any of
+	// Call the ValidateVoucher() function and return a response containing the errors if any of
 	// the checks fail.
 	if data.ValidateVoucher(v, voucher); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	// Call the Insert() method on our movies model, passing in a pointer to the validated movie
-	// struct. This will create a record in the database and update the movie struct with the
+	// Call the Insert() method on our vouchers model, passing in a pointer to the validated voucher
+	// struct. This will create a record in the database and update the voucher struct with the
 	// system-generated information.
 	err = app.models.Vouchers.Insert(voucher)
 	if err != nil {
@@ -116,8 +116,8 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// showMovieHandler handles the "GET /v1/movies/:id" endpoint and returns a JSON response of the
-// requested movie record. If there is an error a JSON formatted error is
+// showMovieHandler handles the "GET /v1/vouchers/{id}" endpoint and returns a JSON response of the
+// requested voucher record. If there is an error a JSON formatted error is
 // returned.
 func (app *application) showVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	// When httprouter is parsing a request, any interpolated URL Parameters will be stored
@@ -148,7 +148,7 @@ func (app *application) showVoucherHandler(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// updateMovieHandler handles "PATCH /v1/movies/:id" endpoint and returns a JSON response
+// updateMovieHandler handles "PUT /v1/voucher/{id}" endpoint and returns a JSON response
 // of the updated movie record. If there is an error a JSON formatted error is
 // returned.
 func (app *application) updateVoucherUsageCountHandler(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +169,7 @@ func (app *application) updateVoucherUsageCountHandler(w http.ResponseWriter, r 
 		return
 	}
 
-	// Write the updated movie record in a JSON response.
+	// Write the updated voucher record in a JSON response.
 	err = app.writeJSON(w, http.StatusOK, envelope{"message": "successfuly used voucher"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -177,14 +177,14 @@ func (app *application) updateVoucherUsageCountHandler(w http.ResponseWriter, r 
 
 }
 
-// deleteMovieHandler handles "DELETE /v1/movies/:id" endpoint and returns a 200 OK status code
+// deleteVoucherHandler handles "DELETE /v1/vouchers/{id}" endpoint and returns a 200 OK status code
 // with a success message in a JSON response. If there is an error a JSON formatted error is
 // returned.
 func (app *application) deleteVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract the movie ID from the URL.
 	code := app.readIDParam(r)
 
-	// Delete the movie from the database. Send a 404 Not Found response to the client if
+	// Delete the voucher from the database. Send a 404 Not Found response to the client if
 	// there isn't a matching record.
 	err := app.models.Vouchers.Delete(code)
 	if err != nil {

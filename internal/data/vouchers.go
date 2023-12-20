@@ -84,6 +84,36 @@ func (m VoucherModel) Get(code string) (*Voucher, error) {
 	return &voucher, nil
 }
 
+func (m VoucherModel) GetVoucherList(code []string) ([]*Voucher, []string, error) {
+	// Create a context with a 3-second timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	// Define a Voucher to decode the document into
+	var vouchers []*Voucher
+	var newVoucherList []string
+
+	// Execute the find operation
+	cursor, err := m.DB.Collection("vouchers").Find(ctx, bson.M{"_id": bson.M{"$in": code}})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// Decode the results into a slice of Vouchers.
+	for cursor.Next(ctx) {
+		var voucher Voucher
+		if err = cursor.Decode(&voucher); err != nil {
+			return nil, nil, err
+		}
+		if voucher.Active {
+			newVoucherList = append(newVoucherList, voucher.Code)
+			vouchers = append(vouchers, &voucher)
+		}
+	}
+
+	return vouchers, newVoucherList, nil
+}
+
 // UpdateUsageCount updates the usageCount and active fields of a specific voucher record in the vouchers table. If the usageCount is
 // less than the usageLimit, increment the usageCount by 1 and set the active field to true. If the usageCount is equal to the usageLimit,
 // set the active field to false. If the voucher code does not exist, return an error. If the voucher code exists but active is false,

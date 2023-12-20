@@ -3,10 +3,8 @@ module github.com/toduluz/savingsquadsbackend
 go 1.21.4
 
 require (
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/pascaldekloe/jwt v1.12.0
 	go.mongodb.org/mongo-driver v1.13.1
 	golang.org/x/crypto v0.16.0

@@ -82,9 +82,10 @@ func main() {
 		return nil
 	})
 
+	jwtSecret := os.Getenv("JWTSECRET")
 	// Parse the JWT signing secret from the command-line-flag. Notice that we leave the
 	// default value as the empty string if no flag is provided.
-	flag.StringVar(&cfg.jwt.secret, "jwt-secret", "", "JWT secret")
+	flag.StringVar(&cfg.jwt.secret, "jwt-secret", jwtSecret, "JWT secret")
 
 	flag.Parse()
 

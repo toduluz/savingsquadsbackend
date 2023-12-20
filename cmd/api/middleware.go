@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/pascaldekloe/jwt"
 	"github.com/toduluz/savingsquadsbackend/internal/data"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -38,6 +36,28 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	})
 }
 
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Use the contextGetUser() helper that we made earlier to retrieve the user
+		// information from the request context.
+		user := app.contextGetUser(r)
+		// If the user is anonymous, then call the authenticationRequiredResponse() to
+		// inform the client that they should authenticate before trying again.
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+		// // If the user is not activated, use the inactiveAccountResponse() helper to
+		// // inform them that they need to activate their account.
+		// if !user.Activated {
+		// 	app.inactiveAccountResponse(w, r)
+		// 	return
+		// }
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (app *application) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
@@ -53,31 +73,23 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 			return
 		}
 		token := headerParts[1]
-		// Parse the JWT and extract the claims. This will return an error if the JWT
-		// contents doesn't match the signature (i.e. the token has been tampered with)
-		// or the algorithm isn't valid.
-		claims, err := jwt.HMACCheck([]byte(token), []byte(app.config.jwt.secret))
+
+		claims, err := app.validateJWTClaims(token)
 		if err != nil {
 			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
-		// Check if the JWT is still valid at this moment in time.
-		if !claims.Valid(time.Now()) {
-			app.invalidAuthenticationTokenResponse(w, r)
-			return
-		}
 		// // Check that the issuer is our application.
-		// if claims.Issuer != "greenlight.alexedwards.net" {
+		// if claims.Issuer != "" {
 		// 	app.invalidAuthenticationTokenResponse(w, r)
 		// 	return
 		// }
 		// // Check that our application is in the expected audiences for the JWT.
-		// if !claims.AcceptAudience("greenlight.alexedwards.net") {
+		// if !claims.AcceptAudience("") {
 		// 	app.invalidAuthenticationTokenResponse(w, r)
 		// 	return
 		// }
-
-		id, err := primitive.ObjectIDFromHex(claims.ID)
+		id, err := primitive.ObjectIDFromHex(claims.Subject)
 		if err != nil {
 			fmt.Println("Error:", err)
 			return

@@ -18,8 +18,7 @@ import (
 // Define an envelope type.
 type envelope map[string]interface{}
 
-// readIDParam reads interpolated "id" from request URL and returns it and nil. If there is an error
-// it returns and 0 and an error.
+// readIDParam reads interpolated "id" from request URL and returns it as a string.
 func (app *application) readIDParam(r *http.Request) string {
 	// params := httprouter.ParamsFromContext(r.Context())
 
