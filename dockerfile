@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . .
 
 # Build the Go application
-RUN go build -o app ./cmd/api-server
+RUN go build -o app ./cmd/api
 
 # Expose the port your application listens on
 EXPOSE 3000
