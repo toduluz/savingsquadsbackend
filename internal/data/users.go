@@ -219,15 +219,15 @@ func (m UserModel) GetAllVouchers(id primitive.ObjectID) ([]string, error) {
 	return user.Vouchers, nil
 }
 
-func (m UserModel) AddVoucher(id primitive.ObjectID, code string) error {
+func (m UserModel) RedeemVoucher(id primitive.ObjectID, code string) error {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Define the filter to match documents where id is id.
-	filter := bson.M{"_id": id}
+	// Define the filter to match documents where id is id and vouchers does not contain code.
+	filter := bson.M{"_id": id, "vouchers": bson.M{"$ne": code}}
 
-	// Define the update document to set the new values of the fields.
+	// Define the update document to push the new voucher code to the vouchers array.
 	update := bson.M{
 		"$push": bson.M{
 			"vouchers": code,
@@ -235,36 +235,70 @@ func (m UserModel) AddVoucher(id primitive.ObjectID, code string) error {
 	}
 
 	// Execute the update operation.
-	_, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
+	result, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
+	}
+
+	// If no document was updated, it means the voucher was already in the vouchers array.
+	if result.ModifiedCount == 0 {
+		return errors.New("voucher already added")
 	}
 
 	return nil
 }
 
-func (m UserModel) DeleteVoucher(id primitive.ObjectID, code string) error {
-	// Create a context with a 3-second timeout.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+func (m UserModel) AddVoucher(ctx mongo.SessionContext, id primitive.ObjectID, code string) error {
 
-	// Define the filter to match documents where id is id.
-	filter := bson.M{"_id": id}
+	// Define the filter to match documents where id is id and vouchers does not contain code.
+	filter := bson.M{"_id": id, "vouchers": bson.M{"$ne": code}}
 
-	// Define the update document to set the new values of the fields.
+	// Define the update document to push the new voucher code to the vouchers array.
 	update := bson.M{
-		"$pull": bson.M{
+		"$push": bson.M{
 			"vouchers": code,
 		},
 	}
 
 	// Execute the update operation.
-	_, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
+	result, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
 
+	// If no document was updated, it means the voucher was already in the vouchers array.
+	if result.ModifiedCount == 0 {
+		return errors.New("voucher already added")
+	}
+
 	return nil
+}
+
+func (m UserModel) GetPoints(id primitive.ObjectID) (int, error) {
+	// Create a context with a 3-second timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	// Define the filter to retrieve the document for the user with the specified id.
+	filter := bson.M{"_id": id}
+
+	// Define the options to set the limit to 1 document.
+	opts := options.FindOne().SetProjection(bson.M{"points": 1})
+
+	// Execute the find operation
+	var user User
+	err := m.DB.Collection("users").FindOne(ctx, filter, opts).Decode(&user)
+	if err != nil {
+		// If the error is a NoDocument error, return ErrRecordNotFound
+		switch {
+		case err == mongo.ErrNoDocuments:
+			return 0, ErrRecordNotFound
+		default:
+			// Otherwise, return the error
+			return 0, err
+		}
+	}
+
+	return user.Points, nil
 }
 
 func (m UserModel) AddPoints(id primitive.ObjectID, points int) error {
@@ -291,13 +325,10 @@ func (m UserModel) AddPoints(id primitive.ObjectID, points int) error {
 	return nil
 }
 
-func (m UserModel) RemovePoints(id primitive.ObjectID, points int) error {
-	// Create a context with a 3-second timeout.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+func (m UserModel) RemovePoints(ctx mongo.SessionContext, id primitive.ObjectID, points int) error {
 
-	// Define the filter to match documents where id is id.
-	filter := bson.M{"_id": id}
+	// Define the filter to match documents where id is id and points is greater than or equal to points.
+	filter := bson.M{"_id": id, "points": bson.M{"$gte": points}}
 
 	// Define the update document to set the new values of the fields.
 	update := bson.M{
@@ -307,15 +338,20 @@ func (m UserModel) RemovePoints(id primitive.ObjectID, points int) error {
 	}
 
 	// Execute the update operation.
-	_, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
+	result, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
+	}
+
+	// Check if the document was not found.
+	if result.MatchedCount == 0 {
+		return errors.New("not enough points")
 	}
 
 	return nil
 }
 
-func (m UserModel) UpdateVouchersList(id primitive.ObjectID, vouchers []string) error {
+func (m UserModel) UpdateVoucherList(id primitive.ObjectID, vouchers []string) error {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

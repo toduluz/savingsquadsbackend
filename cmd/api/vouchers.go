@@ -1,34 +1,14 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/toduluz/savingsquadsbackend/internal/data"
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 )
-
-func vocuherCodeGenerator() (string, error) {
-	b := make([]byte, 15) // Generate 15 random bytes
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	code := base64.URLEncoding.EncodeToString(b)
-
-	// Base64 encoding can include '/' and '+' characters, replace them to avoid issues
-	code = strings.ReplaceAll(code, "/", "a")
-	code = strings.ReplaceAll(code, "+", "b")
-
-	// Return the code
-	return code, nil
-}
 
 func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	// Declare an anonymous struct to hold the information that we expect to be in the HTTP
@@ -41,7 +21,6 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 		IsPercentage bool      `json:"isPercentage"`
 		Starts       time.Time `json:"start"`
 		Expires      time.Time `json:"expires"`
-		Active       bool      `json:"active"`
 		UsageLimit   int       `json:"usageLimit,omitempty"`
 		MinSpend     int       `json:"minSpend,omitempty"`
 		Category     string    `json:"category"`
@@ -56,13 +35,12 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if input.Code == "" {
-		code, err := vocuherCodeGenerator()
-		if err != nil {
-			app.serverErrorResponse(w, r, err)
-			return
-		}
-		input.Code = code
+	var active bool
+
+	if input.Starts.Before(time.Now()) {
+		active = false
+	} else {
+		active = true
 	}
 
 	// Copy the values from the input struct to a new Voucher struct.
@@ -75,7 +53,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 		IsPercentage: input.IsPercentage,
 		Starts:       input.Starts,
 		Expires:      input.Expires,
-		Active:       input.Active,
+		Active:       active,
 		UsageLimit:   input.UsageLimit,
 		UsageCount:   0,
 		MinSpend:     input.MinSpend,

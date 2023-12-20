@@ -2,8 +2,11 @@ package data
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
@@ -27,6 +30,24 @@ type Voucher struct {
 	UsageCount   int       `json:"usageCount" bson:"usageCount"`
 	MinSpend     int       `json:"minSpend" bson:"minSpend"`
 	Category     string    `json:"category" bson:"category"`
+}
+
+func (v *Voucher) vocuherCodeGenerator() error {
+	b := make([]byte, 15) // Generate 15 random bytes
+	_, err := rand.Read(b)
+	if err != nil {
+		return err
+	}
+
+	code := base64.URLEncoding.EncodeToString(b)
+
+	// Base64 encoding can include '/' and '+' characters, replace them to avoid issues
+	code = strings.ReplaceAll(code, "/", "a")
+	code = strings.ReplaceAll(code, "+", "b")
+
+	v.Code = code
+	// Return the code
+	return nil
 }
 
 type VoucherModel struct {
@@ -59,6 +80,21 @@ func (m VoucherModel) Insert(voucher *Voucher) error {
 	return nil
 }
 
+func (m VoucherModel) InsertGeneratedVoucher(ctx mongo.SessionContext, voucher *Voucher) (string, error) {
+	// Generate a voucher code
+	err := voucher.vocuherCodeGenerator()
+	if err != nil {
+		return "", err
+	}
+	// Insert the voucher into the "vouchers" collection.
+	_, err = m.DB.Collection("vouchers").InsertOne(ctx, voucher)
+	if err != nil {
+		return "", err
+	}
+
+	return voucher.Code, nil
+}
+
 // Get returns a specific Voucher based on its id.
 func (m VoucherModel) Get(code string) (*Voucher, error) {
 	// Create a context with a 3-second timeout.
@@ -84,16 +120,16 @@ func (m VoucherModel) Get(code string) (*Voucher, error) {
 	return &voucher, nil
 }
 
-func (m VoucherModel) GetVoucherList(code []string) ([]*Voucher, []string, error) {
+func (m VoucherModel) GetVoucherList(voucherCodes []string) ([]Voucher, []string, error) {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	// Define a Voucher to decode the document into
-	var vouchers []*Voucher
+	var vouchers []Voucher
 	var newVoucherList []string
 
 	// Execute the find operation
-	cursor, err := m.DB.Collection("vouchers").Find(ctx, bson.M{"_id": bson.M{"$in": code}})
+	cursor, err := m.DB.Collection("vouchers").Find(ctx, bson.M{"_id": bson.M{"$in": voucherCodes}})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,7 +143,7 @@ func (m VoucherModel) GetVoucherList(code []string) ([]*Voucher, []string, error
 		}
 		if voucher.Active {
 			newVoucherList = append(newVoucherList, voucher.Code)
-			vouchers = append(vouchers, &voucher)
+			vouchers = append(vouchers, voucher)
 		}
 	}
 

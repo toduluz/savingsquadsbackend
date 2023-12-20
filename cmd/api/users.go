@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/toduluz/savingsquadsbackend/internal/data"
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -140,31 +142,43 @@ func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := app.readIDParam(r)
-	id, err := primitive.ObjectIDFromHex(idStr)
+	// Extract the user from the request context.
+	user := app.contextGetUser(r)
+	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
-
+	// Fetch the user and their vouchers they own from the database.
 	vouchers, err := app.models.Users.GetAllVouchers(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 	}
 
-	vouchersWithDetails, newVoucherList, err := app.models.Vouchers.GetVoucherList(vouchers)
+	// Get the details of the vouchers
+	vouchersWithDetails, latestVoucherList, err := app.models.Vouchers.GetVoucherList(vouchers)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+	}
+
+	// Update the user's voucher list
+	err = app.models.Users.UpdateVoucherList(id, latestVoucherList)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.models.Users.UpdateVouchersList(id, newVoucherList)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
-
+	// Send the data in a JSON response.
 	err = app.writeJSON(w, http.StatusOK, envelope{"vouchers": vouchersWithDetails}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -172,9 +186,32 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 
 }
 
-func (app *application) addPointsHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := app.readIDParam(r)
-	id, err := primitive.ObjectIDFromHex(idStr)
+func (app *application) getUserPointsHandler(w http.ResponseWriter, r *http.Request) {
+	user := app.contextGetUser(r)
+	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	points, err := app.models.Users.GetPoints(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+	}
+	err = app.writeJSON(w, http.StatusOK, envelope{"points": points}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Request) {
+
+	user := app.contextGetUser(r)
+	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
@@ -202,9 +239,101 @@ func (app *application) addPointsHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (app *application) addVoucherHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := app.readIDParam(r)
-	id, err := primitive.ObjectIDFromHex(idStr)
+func (app *application) redeemPointsForVoucherHandler(w http.ResponseWriter, r *http.Request) {
+	user := app.contextGetUser(r)
+	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	var input struct {
+		Points       int       `json:"points"`
+		Description  string    `json:"description"`
+		Discount     int       `json:"discount"`
+		IsPercentage bool      `json:"isPercentage"`
+		Duration     time.Time `json:"duration"`
+		Category     string    `json:"category"`
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	voucher := data.Voucher{
+		Description:  input.Description,
+		Discount:     input.Discount,
+		IsPercentage: input.IsPercentage,
+		Starts:       time.Now(),
+		Expires:      time.Now().Add(time.Duration(input.Duration.Minute())),
+		Active:       true,
+		UsageLimit:   1,
+		UsageCount:   0,
+		MinSpend:     0,
+		Category:     input.Category,
+	}
+	// Start a new session
+	session, err := app.models.Users.DB.Client().StartSession()
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	defer session.EndSession(context.Background())
+
+	// Start a transaction
+	err = session.StartTransaction()
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Define a MongoDB operation
+	operation := func(sessionContext mongo.SessionContext) (interface{}, error) {
+		// Redeem points
+		err = app.models.Users.RemovePoints(sessionContext, id, input.Points)
+		if err != nil {
+			return nil, err
+		}
+
+		// Add voucher
+		voucherCode, err := app.models.Vouchers.InsertGeneratedVoucher(sessionContext, &voucher)
+		if err != nil {
+			return nil, err
+		}
+
+		// Add voucher to user
+		err = app.models.Users.AddVoucher(sessionContext, id, voucherCode)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
+	// Execute the operation
+	_, err = session.WithTransaction(ctx, operation)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// Send a success response
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "points redeemed and voucher added"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+
+}
+
+func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
+
+	user := app.contextGetUser(r)
+	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
@@ -226,13 +355,51 @@ func (app *application) addVoucherHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = app.models.Users.AddVoucher(id, input.Code)
+	err = app.models.Users.RedeemVoucher(id, voucher.Code)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"voucher": voucher}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"voucher": "successfully redeemed voucher"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) useUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
+
+	user := app.contextGetUser(r)
+
+	var input struct {
+		Code string `json:"code"`
+	}
+
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	for _, voucher := range user.Vouchers {
+		if voucher == input.Code {
+			err = app.models.Vouchers.UpdateUsageCount(input.Code)
+			if err != nil {
+				switch {
+				case errors.Is(err, data.ErrEditConflict):
+					app.editConflictResponse(w, r)
+				case errors.Is(err, data.ErrRecordNotFound):
+					app.notFoundResponse(w, r)
+				default:
+					app.serverErrorResponse(w, r, err)
+				}
+				return
+			}
+			break
+		}
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"voucher": "successfully used voucher"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
