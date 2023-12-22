@@ -32,7 +32,7 @@ type Voucher struct {
 	Category     string    `json:"category" bson:"category"`
 }
 
-func (v *Voucher) vocuherCodeGenerator() error {
+func (v *Voucher) VocuherCodeGenerator() error {
 	b := make([]byte, 15) // Generate 15 random bytes
 	_, err := rand.Read(b)
 	if err != nil {
@@ -78,21 +78,6 @@ func (m VoucherModel) Insert(voucher *Voucher) error {
 	}
 
 	return nil
-}
-
-func (m VoucherModel) InsertGeneratedVoucher(ctx mongo.SessionContext, voucher *Voucher) (string, error) {
-	// Generate a voucher code
-	err := voucher.vocuherCodeGenerator()
-	if err != nil {
-		return "", err
-	}
-	// Insert the voucher into the "vouchers" collection.
-	_, err = m.DB.Collection("vouchers").InsertOne(ctx, voucher)
-	if err != nil {
-		return "", err
-	}
-
-	return voucher.Code, nil
 }
 
 // Get returns a specific Voucher based on its id.

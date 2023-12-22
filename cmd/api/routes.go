@@ -28,6 +28,7 @@ func (app *application) routes() http.Handler {
 	// User routes
 	router.HandleFunc("/v1/users/register", app.registerUserHandler).Methods(http.MethodPost)
 	router.HandleFunc("/v1/users/login", app.loginUserHandler).Methods(http.MethodPost)
+	router.HandleFunc("/v1/users/logout", app.requireAuthenticatedUser(app.logoutUserHandler)).Methods(http.MethodPost)
 	router.HandleFunc("/v1/users/vouchers", app.requireAuthenticatedUser(app.getUserVouchersHandler)).Methods(http.MethodGet)
 	router.HandleFunc("/v1/users/vouchers", app.requireAuthenticatedUser(app.redeemUserVoucherHandler)).Methods(http.MethodPut)
 	router.HandleFunc("/v1/users/vouchers/use", app.requireAuthenticatedUser(app.useUserVoucherHandler)).Methods(http.MethodPut)

@@ -117,3 +117,13 @@ func (app *application) notPermittedResponse(w http.ResponseWriter, r *http.Requ
 	message := "your user account doesn't have the necessary permissions to access this resource"
 	app.errorResponse(w, r, http.StatusForbidden, message)
 }
+
+func (app *application) voucherAlreadyExistResponse(w http.ResponseWriter, r *http.Request) {
+	message := "a voucher with the provided voucher code already exists"
+	app.errorResponse(w, r, http.StatusConflict, message)
+}
+
+func (app *application) insufficientPointsResponse(w http.ResponseWriter, r *http.Request) {
+	message := "insufficient points"
+	app.errorResponse(w, r, http.StatusForbidden, message)
+}

@@ -16,7 +16,9 @@ import (
 )
 
 var (
-	ErrDuplicateEmail = errors.New("duplicate email")
+	ErrDuplicateEmail       = errors.New("duplicate email")
+	ErrVoucherAlreadyExists = errors.New("voucher already exists")
+	ErrInsufficientPoints   = errors.New("insufficient points")
 )
 
 // AnonymousUser represents an anonymous user.
@@ -248,32 +250,6 @@ func (m UserModel) RedeemVoucher(id primitive.ObjectID, code string) error {
 	return nil
 }
 
-func (m UserModel) AddVoucher(ctx mongo.SessionContext, id primitive.ObjectID, code string) error {
-
-	// Define the filter to match documents where id is id and vouchers does not contain code.
-	filter := bson.M{"_id": id, "vouchers": bson.M{"$ne": code}}
-
-	// Define the update document to push the new voucher code to the vouchers array.
-	update := bson.M{
-		"$push": bson.M{
-			"vouchers": code,
-		},
-	}
-
-	// Execute the update operation.
-	result, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	// If no document was updated, it means the voucher was already in the vouchers array.
-	if result.ModifiedCount == 0 {
-		return errors.New("voucher already added")
-	}
-
-	return nil
-}
-
 func (m UserModel) GetPoints(id primitive.ObjectID) (int, error) {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -325,9 +301,25 @@ func (m UserModel) AddPoints(id primitive.ObjectID, points int) error {
 	return nil
 }
 
-func (m UserModel) RemovePoints(ctx mongo.SessionContext, id primitive.ObjectID, points int) error {
+func (m UserModel) DeductPointsAndCreateVoucher(id primitive.ObjectID, points int, voucher *Voucher) error {
+	// Create a context with a 3-second timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-	// Define the filter to match documents where id is id and points is greater than or equal to points.
+	// Start a new session.
+	session, err := m.DB.Client().StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(ctx)
+
+	// Start a transaction.
+	err = session.StartTransaction()
+	if err != nil {
+		return err
+	}
+
+	// Define the filter to match documents where id is id.
 	filter := bson.M{"_id": id, "points": bson.M{"$gte": points}}
 
 	// Define the update document to set the new values of the fields.
@@ -338,14 +330,34 @@ func (m UserModel) RemovePoints(ctx mongo.SessionContext, id primitive.ObjectID,
 	}
 
 	// Execute the update operation.
-	result, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
+	res, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
 
-	// Check if the document was not found.
-	if result.MatchedCount == 0 {
-		return errors.New("not enough points")
+	if res.ModifiedCount == 0 {
+		return ErrInsufficientPoints
+	}
+
+	// Create a new voucher.
+	_, err = m.DB.Collection("vouchers").InsertOne(ctx, voucher)
+	if err != nil {
+		var writeException mongo.WriteException
+		if errors.As(err, &writeException) {
+			for _, writeError := range writeException.WriteErrors {
+				if writeError.Code == 11000 {
+					// Handle duplicate key error
+					return ErrVoucherAlreadyExists
+				}
+			}
+		}
+		return err
+	}
+
+	// Commit the transaction.
+	err = session.CommitTransaction(ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -426,6 +438,11 @@ func (m UserModel) Update(user *User) error {
 	}
 
 	return nil
+}
+
+// ValidatePoints checks that the Points field is not a negative integer.
+func ValidatePoints(v *validator.Validator, points int) {
+	v.Check(points >= 0, "points", "must be a positive integer")
 }
 
 // ValidateEmail checks that the Email field is not an empty string and that it matches the regex

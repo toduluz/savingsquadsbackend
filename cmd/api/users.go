@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -9,7 +8,6 @@ import (
 	"github.com/toduluz/savingsquadsbackend/internal/data"
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -83,10 +81,16 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	err = app.setCookie(w, "jwt", string(jwtBytes), 3600*24)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// Note that we also change this to send the client a 202 Accepted status code which
 	// indicates that the request has been accepted for processing, but the processing has
 	// not been completed.
-	err = app.writeJSON(w, http.StatusAccepted, envelope{"user": user, "authentication_token": string(jwtBytes)}, nil)
+	err = app.writeJSON(w, http.StatusAccepted, envelope{"user": user}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -134,8 +138,30 @@ func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request)
 		app.serverErrorResponse(w, r, err)
 		return
 	}
+
+	err = app.setCookie(w, "jwt", string(jwtBytes), 3600*24)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// Convert the []byte slice to a string and return it in a JSON response.
-	err = app.writeJSON(w, http.StatusCreated, envelope{"authentication_token": string(jwtBytes)}, nil)
+	err = app.writeJSON(w, http.StatusCreated, envelope{"message": "successfully logged in"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) logoutUserHandler(w http.ResponseWriter, r *http.Request) {
+	// Set the value of the "jwt" cookie to the empty string.
+	err := app.setCookie(w, "jwt", "", -1)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	// Send a 200 OK status code and a JSON response with the message "you have been
+	// logged out successfully".
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "successfully logged out"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -158,6 +184,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
+		return
 	}
 
 	// Get the details of the vouchers
@@ -169,6 +196,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
+		return
 	}
 
 	// Update the user's voucher list
@@ -201,6 +229,7 @@ func (app *application) getUserPointsHandler(w http.ResponseWriter, r *http.Requ
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
+		return
 	}
 	err = app.writeJSON(w, http.StatusOK, envelope{"points": points}, nil)
 	if err != nil {
@@ -274,51 +303,31 @@ func (app *application) redeemPointsForVoucherHandler(w http.ResponseWriter, r *
 		MinSpend:     0,
 		Category:     input.Category,
 	}
-	// Start a new session
-	session, err := app.models.Users.DB.Client().StartSession()
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
-	defer session.EndSession(context.Background())
 
-	// Start a transaction
-	err = session.StartTransaction()
+	err = voucher.VocuherCodeGenerator()
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	// Define a MongoDB operation
-	operation := func(sessionContext mongo.SessionContext) (interface{}, error) {
-		// Redeem points
-		err = app.models.Users.RemovePoints(sessionContext, id, input.Points)
-		if err != nil {
-			return nil, err
-		}
-
-		// Add voucher
-		voucherCode, err := app.models.Vouchers.InsertGeneratedVoucher(sessionContext, &voucher)
-		if err != nil {
-			return nil, err
-		}
-
-		// Add voucher to user
-		err = app.models.Users.AddVoucher(sessionContext, id, voucherCode)
-		if err != nil {
-			return nil, err
-		}
-
-		return nil, nil
+	validator := validator.New()
+	data.ValidateVoucher(validator, &voucher)
+	data.ValidatePoints(validator, input.Points)
+	if !validator.Valid() {
+		app.failedValidationResponse(w, r, validator.Errors)
+		return
 	}
 
-	// Execute the operation
-	_, err = session.WithTransaction(ctx, operation)
+	err = app.models.Users.DeductPointsAndCreateVoucher(id, input.Points, &voucher)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrVoucherAlreadyExists):
+			app.voucherAlreadyExistResponse(w, r)
+		case errors.Is(err, data.ErrInsufficientPoints):
+			app.insufficientPointsResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
