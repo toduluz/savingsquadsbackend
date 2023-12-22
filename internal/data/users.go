@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
@@ -92,8 +91,6 @@ func (p *Password) Set(plaintextPassword string) error {
 // Matches checks whether the provided plaintext password matches the hashed password stored in
 // the password struct, returning true if it matches and false otherwise.
 func (p *Password) Matches(plaintextPassword string) (bool, error) {
-	fmt.Println("p.Hash:", p.Hash)
-	fmt.Println("plaintextPassword:", plaintextPassword)
 	err := bcrypt.CompareHashAndPassword(p.Hash, []byte(plaintextPassword))
 	if err != nil {
 		switch {
