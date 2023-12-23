@@ -10,7 +10,7 @@ func (app *application) setCookie(w http.ResponseWriter, name, value string, max
 	cookie := http.Cookie{
 		Name:     name,
 		Value:    value,
-		Path:     "/",
+		Path:     "/v1/users",
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
@@ -26,10 +26,10 @@ func (app *application) setCookie(w http.ResponseWriter, name, value string, max
 	return nil
 }
 
-func (app *application) getCookie(r *http.Request) (string, error) {
+func (app *application) getCookie(r *http.Request, value string) (string, error) {
 	// Use the ReadSigned() function, passing in the secret key as the final
 	// argument.
-	value, err := cookies.ReadSigned(r, "exampleCookie", []byte(app.config.jwt.secret))
+	value, err := cookies.ReadSigned(r, value, []byte(app.config.jwt.secret))
 	if err != nil {
 		return "", err
 	}

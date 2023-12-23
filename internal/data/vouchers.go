@@ -3,15 +3,13 @@ package data
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"log"
-	"strings"
+	"math/big"
 	"time"
 
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -33,19 +31,19 @@ type Voucher struct {
 }
 
 func (v *Voucher) VocuherCodeGenerator() error {
+	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
+
 	b := make([]byte, 15) // Generate 15 random bytes
-	_, err := rand.Read(b)
-	if err != nil {
-		return err
+	for i := range b {
+		max := big.NewInt(int64(len(letters)))
+		randNum, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return err
+		}
+		b[i] = letters[randNum.Int64()]
 	}
 
-	code := base64.URLEncoding.EncodeToString(b)
-
-	// Base64 encoding can include '/' and '+' characters, replace them to avoid issues
-	code = strings.ReplaceAll(code, "/", "a")
-	code = strings.ReplaceAll(code, "+", "b")
-
-	v.Code = code
+	v.Code = string(b)
 	// Return the code
 	return nil
 }
@@ -105,18 +103,17 @@ func (m VoucherModel) Get(code string) (*Voucher, error) {
 	return &voucher, nil
 }
 
-func (m VoucherModel) GetVoucherList(voucherCodes []string) ([]Voucher, []string, error) {
+func (m VoucherModel) GetVoucherList(voucherCodes []string) ([]Voucher, error) {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	// Define a Voucher to decode the document into
 	var vouchers []Voucher
-	var newVoucherList []string
 
 	// Execute the find operation
 	cursor, err := m.DB.Collection("vouchers").Find(ctx, bson.M{"_id": bson.M{"$in": voucherCodes}})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer cursor.Close(ctx)
 
@@ -124,15 +121,12 @@ func (m VoucherModel) GetVoucherList(voucherCodes []string) ([]Voucher, []string
 	for cursor.Next(ctx) {
 		var voucher Voucher
 		if err = cursor.Decode(&voucher); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		if voucher.Active {
-			newVoucherList = append(newVoucherList, voucher.Code)
-			vouchers = append(vouchers, voucher)
-		}
+		vouchers = append(vouchers, voucher)
 	}
 
-	return vouchers, newVoucherList, nil
+	return vouchers, nil
 }
 
 // UpdateUsageCount updates the usageCount and active fields of a specific voucher record in the vouchers table. If the usageCount is
@@ -236,11 +230,7 @@ func (m *VoucherModel) GetAllVouchers(code string, starts time.Time, expires tim
 
 	// If a cursor is provided, add a condition to the filter to only find documents with an _id greater than the cursor.
 	if f.Cursor != "" {
-		cursorID, err := primitive.ObjectIDFromHex(f.Cursor)
-		if err != nil {
-			return nil, Metadata{}, err
-		}
-		filter = append(filter, bson.E{"_id", bson.M{"$gt": cursorID}})
+		filter = append(filter, bson.E{"_id", bson.M{"$gt": f.Cursor}})
 	}
 	// Execute the MongoDB find operation with limit and sort.
 	opts := options.Find().SetLimit(int64(f.limit())).SetSort(bson.D{{f.sortColumn(), sortDirection}})
@@ -261,7 +251,10 @@ func (m *VoucherModel) GetAllVouchers(code string, starts time.Time, expires tim
 	}
 
 	// Generate a PaginationData struct, passing in the page size and the _id of the last document.
-	metadata := formatPaginationData(f.PageSize, vouchers[len(vouchers)-1].Code)
+	var metadata Metadata
+	if len(vouchers) > 0 {
+		metadata = formatPaginationData(f.PageSize, vouchers[len(vouchers)-1].Code)
+	}
 
 	// If everything went OK, then return the slice of the vouchers and paginationData.
 	return vouchers, metadata, nil

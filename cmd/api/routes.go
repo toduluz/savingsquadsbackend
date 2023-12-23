@@ -17,25 +17,23 @@ func (app *application) routes() http.Handler {
 	router.MethodNotAllowedHandler = http.HandlerFunc(app.methodNotAllowedResponse)
 
 	// Admin routes
-	/*
-		router.HandleFunc("/v1/vouchers", app.requireAuthenticatedUser(app.listVouchersHandler)).Methods(http.MethodGet)
-		router.HandleFunc("/v1/vouchers", app.requireAuthenticatedUser(app.createVoucherHandler)).Methods(http.MethodPost)
-		router.HandleFunc("/v1/vouchers/{id}", app.requireAuthenticatedUser(app.showVoucherHandler)).Methods(http.MethodGet)
-		router.HandleFunc("/v1/vouchers/{id}", app.requireAuthenticatedUser(app.deleteVoucherHandler)).Methods(http.MethodDelete)
-		router.HandleFunc("/v1/vouchers/{id}/use", app.requireAuthenticatedUser(app.updateVoucherUsageCountHandler)).Methods(http.MethodPut)
-	*/
+
+	router.HandleFunc("/v1/vouchers", app.requireAuthenticatedUser(app.listVouchersHandler)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/vouchers", app.requireAuthenticatedUser(app.createVoucherHandler)).Methods(http.MethodPost)
+	router.HandleFunc("/v1/vouchers/{id}", app.requireAuthenticatedUser(app.showVoucherHandler)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/vouchers/{id}", app.requireAuthenticatedUser(app.deleteVoucherHandler)).Methods(http.MethodDelete)
 
 	// User routes
 	router.HandleFunc("/v1/users/register", app.registerUserHandler).Methods(http.MethodPost)
 	router.HandleFunc("/v1/users/login", app.loginUserHandler).Methods(http.MethodPost)
 	router.HandleFunc("/v1/users/logout", app.requireAuthenticatedUser(app.logoutUserHandler)).Methods(http.MethodPost)
 	router.HandleFunc("/v1/users/vouchers", app.requireAuthenticatedUser(app.getUserVouchersHandler)).Methods(http.MethodGet)
-	router.HandleFunc("/v1/users/vouchers", app.requireAuthenticatedUser(app.redeemUserVoucherHandler)).Methods(http.MethodPut)
-	router.HandleFunc("/v1/users/vouchers/use", app.requireAuthenticatedUser(app.useUserVoucherHandler)).Methods(http.MethodPut)
+	router.HandleFunc("/v1/users/vouchers/{id}/redeem", app.requireAuthenticatedUser(app.redeemUserVoucherHandler)).Methods(http.MethodPut)
+	router.HandleFunc("/v1/users/vouchers/{id}/use", app.requireAuthenticatedUser(app.useUserVoucherHandler)).Methods(http.MethodPut)
 	router.HandleFunc("/v1/users/points", app.requireAuthenticatedUser(app.getUserPointsHandler)).Methods(http.MethodGet)
 	router.HandleFunc("/v1/users/points", app.requireAuthenticatedUser(app.addUserPointsHandler)).Methods(http.MethodPut)
-	router.HandleFunc("/v1/users/points/redeem", app.requireAuthenticatedUser(app.redeemPointsForVoucherHandler)).Methods(http.MethodPut)
-	//TODO: router.HandleFunc("/v1/users/vouchers/best", app.requireAuthenticatedUser(app.getUserBestVoucherHandler)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/users/points/exchange", app.requireAuthenticatedUser(app.exchangePointsForVoucherHandler)).Methods(http.MethodPost)
+	// TODO: router.HandleFunc("/v1/users/vouchers/best", app.requireAuthenticatedUser(app.getUserBestVoucherHandler)).Methods(http.MethodGet)
 
 	return router
 }

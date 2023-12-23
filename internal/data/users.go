@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	ErrDuplicateEmail       = errors.New("duplicate email")
-	ErrVoucherAlreadyExists = errors.New("voucher already exists")
-	ErrInsufficientPoints   = errors.New("insufficient points")
+	ErrDuplicateEmail           = errors.New("duplicate email")
+	ErrVoucherAlreadyExists     = errors.New("voucher already exists")
+	ErrExchangePointsForVoucher = errors.New("problem exchanging points for voucher")
+	ErrVoucherAlreadyRedeeemed  = errors.New("voucher already redeemed")
 )
 
 // AnonymousUser represents an anonymous user.
@@ -35,7 +36,7 @@ type User struct {
 	Password  Password           `json:"-" bson:"password"`
 	Addresses []Address          `json:"addresses" bson:"addresses"`
 	Phone     []Phone            `json:"phone" bson:"phone"`
-	Vouchers  []string           `json:"vouchers" bson:"vouchers"`
+	Vouchers  map[string]int     `json:"vouchers" bson:"vouchers"`
 	Points    int                `json:"points" bson:"points"`
 	Version   int                `json:"version" bson:"version"`
 }
@@ -193,7 +194,7 @@ func (m UserModel) GetByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
-func (m UserModel) GetAllVouchers(id primitive.ObjectID) ([]string, error) {
+func (m UserModel) GetAllVouchers(id primitive.ObjectID) (map[string]int, error) {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -218,19 +219,17 @@ func (m UserModel) GetAllVouchers(id primitive.ObjectID) ([]string, error) {
 	return user.Vouchers, nil
 }
 
-func (m UserModel) RedeemVoucher(id primitive.ObjectID, code string) error {
+func (m UserModel) RedeemVoucher(id primitive.ObjectID, code string, number int) error {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// Define the filter to match documents where id is id and vouchers does not contain code.
-	filter := bson.M{"_id": id, "vouchers": bson.M{"$ne": code}}
+	filter := bson.M{"_id": id, "vouchers." + code: bson.M{"$exists": false}}
 
-	// Define the update document to push the new voucher code to the vouchers array.
+	// Define the update document to set the new values of the fields.
 	update := bson.M{
-		"$push": bson.M{
-			"vouchers": code,
-		},
+		"$set": bson.M{"vouchers." + code: number},
 	}
 
 	// Execute the update operation.
@@ -241,7 +240,7 @@ func (m UserModel) RedeemVoucher(id primitive.ObjectID, code string) error {
 
 	// If no document was updated, it means the voucher was already in the vouchers array.
 	if result.ModifiedCount == 0 {
-		return errors.New("voucher already added")
+		return ErrVoucherAlreadyRedeeemed
 	}
 
 	return nil
@@ -316,11 +315,14 @@ func (m UserModel) DeductPointsAndCreateVoucher(id primitive.ObjectID, points in
 		return err
 	}
 
-	// Define the filter to match documents where id is id.
-	filter := bson.M{"_id": id, "points": bson.M{"$gte": points}}
+	// Define the filter to match documents where id is id and points is greater than or equal to points.
+	filter := bson.M{"_id": id, "points": bson.M{"$gte": points}, "vouchers." + voucher.Code: bson.M{"$exists": false}}
 
 	// Define the update document to set the new values of the fields.
 	update := bson.M{
+		"$set": bson.M{
+			"vouchers." + voucher.Code: 1,
+		},
 		"$inc": bson.M{
 			"points": -points,
 		},
@@ -333,7 +335,7 @@ func (m UserModel) DeductPointsAndCreateVoucher(id primitive.ObjectID, points in
 	}
 
 	if res.ModifiedCount == 0 {
-		return ErrInsufficientPoints
+		return ErrExchangePointsForVoucher
 	}
 
 	// Create a new voucher.
@@ -360,7 +362,7 @@ func (m UserModel) DeductPointsAndCreateVoucher(id primitive.ObjectID, points in
 	return nil
 }
 
-func (m UserModel) UpdateVoucherList(id primitive.ObjectID, vouchers []string) error {
+func (m UserModel) UpdateVoucherList(id primitive.ObjectID, vouchers map[string]int) error {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -377,60 +379,6 @@ func (m UserModel) UpdateVoucherList(id primitive.ObjectID, vouchers []string) e
 	// Execute the update operation.
 	_, err := m.DB.Collection("users").UpdateOne(ctx, filter, update)
 	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Update updates the details for a specific user in the users table. Note, we check against the
-// version field to help prevent any race conditions during the request cycle. Also, we check
-// for a violation of the "user_email_key" constraint.
-func (m UserModel) Update(user *User) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	// Define the filter to retrieve the document for the user with the specified id.
-	filter := bson.M{"_id": user.ID}
-
-	// Fetch the current state of the user.
-	var currentUser User
-	err := m.DB.Collection("users").FindOne(ctx, filter).Decode(&currentUser)
-	if err != nil {
-		return err
-	}
-
-	// Define the update document to set the new values of the fields.
-	update := bson.M{
-		"$set": bson.M{
-			"name":       user.Name,
-			"email":      user.Email,
-			"vouchers":   user.Vouchers,
-			"points":     user.Points,
-			"updated_at": time.Now(),
-		},
-	}
-
-	isChangePassword, err := currentUser.Password.Matches(*user.Password.plaintext)
-	if err != nil {
-		return err
-	}
-
-	// Check if the email, password, activated, or role has changed.
-	if isChangePassword {
-		update["$inc"] = bson.M{"version": 1} // increment the version
-	}
-
-	// Execute the update operation.
-	_, err = m.DB.Collection("users").UpdateOne(ctx, filter, update)
-	if err != nil {
-		// Check if it's a duplicate key error (which means the email already exists).
-		if writeException, ok := err.(mongo.WriteException); ok {
-			for _, writeError := range writeException.WriteErrors {
-				if writeError.Code == 11000 {
-					return ErrDuplicateEmail
-				}
-			}
-		}
 		return err
 	}
 

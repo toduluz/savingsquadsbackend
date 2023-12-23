@@ -24,7 +24,7 @@ func (app *application) readIDParam(r *http.Request) string {
 
 	// param := params.ByName("id")
 	vars := mux.Vars(r)
-	param := vars["id"]
+	param := strings.ToLower(vars["id"])
 
 	return param
 }
@@ -42,7 +42,6 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 
 	// Append a newline to make it easier to view in terminal applications.
 	js = append(js, '\n')
-
 	// At this point, we know that we won't encounter any more errors before writing the response,
 	// so it's safe to add any headers that we want to include. We loop through the header map
 	// and add each header to the http.ResponseWriter header map. Note that it's OK if the

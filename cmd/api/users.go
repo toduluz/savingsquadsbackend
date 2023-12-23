@@ -36,7 +36,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Email:     input.Email,
 		Addresses: []data.Address{},
 		Phone:     []data.Phone{},
-		Vouchers:  []string{},
+		Vouchers:  map[string]int{},
 		Points:    0,
 		Version:   1,
 	}
@@ -175,39 +175,81 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	// Fetch the user and their vouchers they own from the database.
-	vouchers, err := app.models.Users.GetAllVouchers(id)
-	if err != nil {
-		switch {
-		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
-		default:
-			app.serverErrorResponse(w, r, err)
-		}
-		return
+
+	var voucherCodes []string
+	for code := range user.Vouchers {
+		voucherCodes = append(voucherCodes, code)
 	}
 
-	// Get the details of the vouchers
-	vouchersWithDetails, latestVoucherList, err := app.models.Vouchers.GetVoucherList(vouchers)
-	if err != nil {
-		switch {
-		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
-		default:
-			app.serverErrorResponse(w, r, err)
+	var vouchersWithDetails []data.Voucher
+	if len(voucherCodes) > 0 {
+
+		// Get the details of the vouchers
+		vouchersWithDetails, err = app.models.Vouchers.GetVoucherList(voucherCodes)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.notFoundResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
 		}
-		return
+	}
+
+	var vouchersWithDetailsAndCount []struct {
+		Code               string    `json:"code"`
+		Description        string    `json:"description"`
+		Discount           int       `json:"discount"`
+		IsPercentage       bool      `json:"isPercentage"`
+		Starts             time.Time `json:"starts"`
+		Expires            time.Time `json:"expires"`
+		Active             bool      `json:"active"`
+		UserUsageRemaining int       `json:"userUsageRemaining"`
+		MinSpend           int       `json:"minSpend"`
+		Category           string    `json:"category"`
+	}
+
+	for _, voucher := range vouchersWithDetails {
+		if !voucher.Active {
+			delete(user.Vouchers, voucher.Code)
+		} else {
+			vouchersWithDetailsAndCount = append(vouchersWithDetailsAndCount, struct {
+				Code               string    `json:"code"`
+				Description        string    `json:"description"`
+				Discount           int       `json:"discount"`
+				IsPercentage       bool      `json:"isPercentage"`
+				Starts             time.Time `json:"starts"`
+				Expires            time.Time `json:"expires"`
+				Active             bool      `json:"active"`
+				UserUsageRemaining int       `json:"userUsageRemaining"`
+				MinSpend           int       `json:"minSpend"`
+				Category           string    `json:"category"`
+			}{
+				Code:               voucher.Code,
+				Description:        voucher.Description,
+				Discount:           voucher.Discount,
+				IsPercentage:       voucher.IsPercentage,
+				Starts:             voucher.Starts,
+				Expires:            voucher.Expires,
+				Active:             voucher.Active,
+				UserUsageRemaining: user.Vouchers[voucher.Code],
+				MinSpend:           voucher.MinSpend,
+				Category:           voucher.Category,
+			})
+
+		}
 	}
 
 	// Update the user's voucher list
-	err = app.models.Users.UpdateVoucherList(id, latestVoucherList)
+	err = app.models.Users.UpdateVoucherList(id, user.Vouchers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	// Send the data in a JSON response.
-	err = app.writeJSON(w, http.StatusOK, envelope{"vouchers": vouchersWithDetails}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"vouchers": vouchersWithDetailsAndCount}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -268,7 +310,7 @@ func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (app *application) redeemPointsForVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
 	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
 	if err != nil {
@@ -277,12 +319,12 @@ func (app *application) redeemPointsForVoucherHandler(w http.ResponseWriter, r *
 	}
 
 	var input struct {
-		Points       int       `json:"points"`
-		Description  string    `json:"description"`
-		Discount     int       `json:"discount"`
-		IsPercentage bool      `json:"isPercentage"`
-		Duration     time.Time `json:"duration"`
-		Category     string    `json:"category"`
+		Points       int    `json:"points"`
+		Description  string `json:"description"`
+		Discount     int    `json:"discount"`
+		IsPercentage bool   `json:"isPercentage"`
+		Duration     int    `json:"duration"`
+		Category     string `json:"category"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -296,7 +338,7 @@ func (app *application) redeemPointsForVoucherHandler(w http.ResponseWriter, r *
 		Discount:     input.Discount,
 		IsPercentage: input.IsPercentage,
 		Starts:       time.Now(),
-		Expires:      time.Now().Add(time.Duration(input.Duration.Minute())),
+		Expires:      time.Now().Add(time.Duration(input.Duration) * time.Hour),
 		Active:       true,
 		UsageLimit:   1,
 		UsageCount:   0,
@@ -323,8 +365,8 @@ func (app *application) redeemPointsForVoucherHandler(w http.ResponseWriter, r *
 		switch {
 		case errors.Is(err, data.ErrVoucherAlreadyExists):
 			app.voucherAlreadyExistResponse(w, r)
-		case errors.Is(err, data.ErrInsufficientPoints):
-			app.insufficientPointsResponse(w, r)
+		case errors.Is(err, data.ErrExchangePointsForVoucher):
+			app.problemExchangePointsForVoucherResponse(w, r)
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -348,25 +390,32 @@ func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var input struct {
-		Code string `json:"code"`
-	}
+	code := app.readIDParam(r)
 
-	err = app.readJSON(w, r, &input)
+	voucher, err := app.models.Vouchers.Get(code)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
-	voucher, err := app.models.Vouchers.Get(input.Code)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
+	if !voucher.Active {
+		app.voucherNotAvailableResponse(w, r)
 		return
 	}
 
-	err = app.models.Users.RedeemVoucher(id, voucher.Code)
+	err = app.models.Users.RedeemVoucher(id, voucher.Code, 1)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrVoucherAlreadyRedeeemed):
+			app.voucherAlreadyRedeemedResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
@@ -380,35 +429,38 @@ func (app *application) useUserVoucherHandler(w http.ResponseWriter, r *http.Req
 
 	user := app.contextGetUser(r)
 
-	var input struct {
-		Code string `json:"code"`
-	}
+	voucherCode := app.readIDParam(r)
 
-	err := app.readJSON(w, r, &input)
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
-
-	for _, voucher := range user.Vouchers {
-		if voucher == input.Code {
-			err = app.models.Vouchers.UpdateUsageCount(input.Code)
+	if voucherCount, ok := user.Vouchers[voucherCode]; ok {
+		if voucherCount > 0 {
+			user.Vouchers[voucherCode]--
+			err := app.models.Users.UpdateVoucherList(user.ID, user.Vouchers)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+			err = app.models.Vouchers.UpdateUsageCount(voucherCode)
 			if err != nil {
 				switch {
-				case errors.Is(err, data.ErrEditConflict):
-					app.editConflictResponse(w, r)
 				case errors.Is(err, data.ErrRecordNotFound):
 					app.notFoundResponse(w, r)
+				case errors.Is(err, data.ErrEditConflict):
+					app.editConflictResponse(w, r)
 				default:
 					app.serverErrorResponse(w, r, err)
 				}
 				return
 			}
-			break
+		} else {
+			app.voucherNotAvailableResponse(w, r)
+			return
 		}
+	} else {
+		app.voucherNotAvailableResponse(w, r)
+		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"voucher": "successfully used voucher"}, nil)
+	err := app.writeJSON(w, http.StatusOK, envelope{"voucher": "successfully used voucher"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

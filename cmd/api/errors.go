@@ -123,7 +123,17 @@ func (app *application) voucherAlreadyExistResponse(w http.ResponseWriter, r *ht
 	app.errorResponse(w, r, http.StatusConflict, message)
 }
 
-func (app *application) insufficientPointsResponse(w http.ResponseWriter, r *http.Request) {
-	message := "insufficient points"
+func (app *application) problemExchangePointsForVoucherResponse(w http.ResponseWriter, r *http.Request) {
+	message := "there was a problem exchanging points for voucher"
 	app.errorResponse(w, r, http.StatusForbidden, message)
+}
+
+func (app *application) voucherNotAvailableResponse(w http.ResponseWriter, r *http.Request) {
+	message := "the requested voucher is not available"
+	app.errorResponse(w, r, http.StatusNotFound, message)
+}
+
+func (app *application) voucherAlreadyRedeemedResponse(w http.ResponseWriter, r *http.Request) {
+	message := "the requested voucher has already been redeemed"
+	app.errorResponse(w, r, http.StatusConflict, message)
 }

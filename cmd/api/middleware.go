@@ -61,7 +61,7 @@ func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.Han
 func (app *application) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		token, err := app.getCookie(r)
+		token, err := app.getCookie(r, "jwt")
 		if err != nil {
 			switch {
 			case errors.Is(err, http.ErrNoCookie):

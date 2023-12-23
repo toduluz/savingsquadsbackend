@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/toduluz/savingsquadsbackend/internal/data"
@@ -38,6 +39,12 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 	var active bool
 
 	if input.Starts.Before(time.Now()) {
+		active = true
+	} else {
+		active = false
+	}
+
+	if input.Expires.Before(time.Now()) {
 		active = false
 	} else {
 		active = true
@@ -45,7 +52,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 
 	// Copy the values from the input struct to a new Voucher struct.
 	voucher := &data.Voucher{
-		Code:         input.Code,
+		Code:         strings.ToLower(input.Code),
 		CreatedAt:    time.Now(),
 		ModifiedAt:   time.Now(),
 		Description:  input.Description,
@@ -84,7 +91,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 	// method to add a new Location header,
 	// interpolating the system-generated ID for our new movie in the URL.
 	headers := make(http.Header)
-	headers.Set("Location", fmt.Sprintf("/v1/vouchers/%d", voucher.Code))
+	headers.Set("Location", fmt.Sprintf("/v1/vouchers/%s", voucher.Code))
 
 	// Write a JSON response with a 201 Created status code, the movie data in the response body,
 	// and the Location header.
@@ -124,35 +131,6 @@ func (app *application) showVoucherHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
-}
-
-// updateMovieHandler handles "PUT /v1/voucher/{id}" endpoint and returns a JSON response
-// of the updated movie record. If there is an error a JSON formatted error is
-// returned.
-func (app *application) updateVoucherUsageCountHandler(w http.ResponseWriter, r *http.Request) {
-	// Extract the movie ID from the URL.
-	code := app.readIDParam(r)
-
-	// Pass the updated movie record to the Update() method.
-	err := app.models.Vouchers.UpdateUsageCount(code)
-	if err != nil {
-		switch {
-		case errors.Is(err, data.ErrEditConflict):
-			app.editConflictResponse(w, r)
-		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
-		default:
-			app.serverErrorResponse(w, r, err)
-		}
-		return
-	}
-
-	// Write the updated voucher record in a JSON response.
-	err = app.writeJSON(w, http.StatusOK, envelope{"message": "successfuly used voucher"}, nil)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-	}
-
 }
 
 // deleteVoucherHandler handles "DELETE /v1/vouchers/{id}" endpoint and returns a 200 OK status code
@@ -202,7 +180,7 @@ func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Reque
 	// Use our helpers to extract the title and genres query string values, falling back to the
 	// defaults of an empty string and an empty slice, respectively, if they are not provided
 	// by the client.
-	input.Code = app.readStrings(qs, "code", "")
+	input.Code = strings.ToLower(app.readStrings(qs, "code", ""))
 	input.Starts = app.readTime(qs, "starts", time.Time{})
 	input.Expires = app.readTime(qs, "expires", time.Time{})
 	input.Active = app.readBool(qs, "active", false)
