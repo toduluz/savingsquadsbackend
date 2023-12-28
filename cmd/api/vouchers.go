@@ -221,7 +221,7 @@ func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Send a JSON response containing the movie data.
-	if err := app.writeJSON(w, http.StatusOK, envelope{"vouchers": vouchers, "metadata": metadata}, nil); err != nil {
+	if err := app.writeJSON(w, http.StatusOK, envelope{"vouchers": vouchers, "metadata": *metadata}, nil); err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
 }

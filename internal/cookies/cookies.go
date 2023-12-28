@@ -84,7 +84,6 @@ func ReadSigned(r *http.Request, name string, secretKey []byte) (string, error) 
 	// Split apart the signature and original cookie value.
 	signature := signedValue[:sha256.Size]
 	value := signedValue[sha256.Size:]
-
 	// Recalculate the HMAC signature of the cookie name and original value.
 	mac := hmac.New(sha256.New, secretKey)
 	mac.Write([]byte(name))

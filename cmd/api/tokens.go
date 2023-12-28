@@ -13,7 +13,7 @@ func (app *application) createJWTClaims(user *data.User) ([]byte, error) {
 	// time of now and validity window of the next 24 hours. We also set the issuer and
 	// audience to a unique identifier for our application.
 	var claims jwt.Claims
-	claims.Subject = user.ID.Hex()
+	claims.Subject = user.ID
 	claims.Issued = jwt.NewNumericTime(time.Now())
 	claims.NotBefore = jwt.NewNumericTime(time.Now())
 	claims.Expires = jwt.NewNumericTime(time.Now().Add(24 * time.Hour))

@@ -2,51 +2,14 @@ package data
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"log"
-	"math/big"
 	"time"
 
-	"github.com/toduluz/savingsquadsbackend/internal/validator"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type Voucher struct {
-	Code         string    `json:"id" bson:"_id"`
-	CreatedAt    time.Time `json:"-" bson:"created_at"`
-	ModifiedAt   time.Time `json:"-" bson:"updated_at"`
-	Description  string    `json:"description" bson:"description"`
-	Discount     int       `json:"discount" bson:"discount"`
-	IsPercentage bool      `json:"isPercentage" bson:"isPercentage"`
-	Starts       time.Time `json:"start" bson:"start"`
-	Expires      time.Time `json:"expires" bson:"expires"`
-	Active       bool      `json:"active" bson:"active"`
-	UsageLimit   int       `json:"usageLimit" bson:"usageLimit"`
-	UsageCount   int       `json:"usageCount" bson:"usageCount"`
-	MinSpend     int       `json:"minSpend" bson:"minSpend"`
-	Category     string    `json:"category" bson:"category"`
-}
-
-func (v *Voucher) VocuherCodeGenerator() error {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-
-	b := make([]byte, 15) // Generate 15 random bytes
-	for i := range b {
-		max := big.NewInt(int64(len(letters)))
-		randNum, err := rand.Int(rand.Reader, max)
-		if err != nil {
-			return err
-		}
-		b[i] = letters[randNum.Int64()]
-	}
-
-	v.Code = string(b)
-	// Return the code
-	return nil
-}
 
 type VoucherModel struct {
 	DB       *mongo.Database
@@ -199,7 +162,7 @@ func (m VoucherModel) Delete(code string) error {
 	return nil
 }
 
-func (m *VoucherModel) GetAllVouchers(code string, starts time.Time, expires time.Time, active bool, minSpend int, category string, f *Filters) ([]*Voucher, Metadata, error) {
+func (m VoucherModel) GetAllVouchers(code string, starts time.Time, expires time.Time, active bool, minSpend int, category string, f *Filters) ([]Voucher, *Metadata, error) {
 	// Create a context with a 3-second timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -236,18 +199,18 @@ func (m *VoucherModel) GetAllVouchers(code string, starts time.Time, expires tim
 	opts := options.Find().SetLimit(int64(f.limit())).SetSort(bson.D{{f.sortColumn(), sortDirection}})
 	cursor, err := m.DB.Collection("vouchers").Find(ctx, filter, opts)
 	if err != nil {
-		return nil, Metadata{}, err
+		return nil, &Metadata{}, err
 	}
 	defer cursor.Close(ctx)
 
 	// Decode the results into a slice of Vouchers.
-	var vouchers []*Voucher
+	var vouchers []Voucher
 	for cursor.Next(ctx) {
 		var voucher Voucher
 		if err = cursor.Decode(&voucher); err != nil {
-			return nil, Metadata{}, err
+			return nil, &Metadata{}, err
 		}
-		vouchers = append(vouchers, &voucher)
+		vouchers = append(vouchers, voucher)
 	}
 
 	// Generate a PaginationData struct, passing in the page size and the _id of the last document.
@@ -257,21 +220,5 @@ func (m *VoucherModel) GetAllVouchers(code string, starts time.Time, expires tim
 	}
 
 	// If everything went OK, then return the slice of the vouchers and paginationData.
-	return vouchers, metadata, nil
-}
-
-// ValidateVoucher runs validation checks on the Voucher type.
-func ValidateVoucher(v *validator.Validator, voucher *Voucher) {
-	v.Check(voucher.Code != "", "code", "must be provided")
-	v.Check(len(voucher.Code) <= 20, "code", "must not be more than 20 characters long")
-
-	v.Check(voucher.Description != "", "description", "must be provided")
-	v.Check(len(voucher.Description) <= 500, "description", "must not be more than 500 characters long")
-
-	v.Check(voucher.Discount >= 0, "discount", "must be a positive number")
-	v.Check(voucher.Discount <= 100, "discount", "must not be more than 100")
-
-	v.Check(voucher.UsageLimit >= 0, "usageLimit", "must be a positive number")
-
-	v.Check(voucher.Starts.Before(voucher.Expires), "start", "must be before the expiry date")
+	return vouchers, &metadata, nil
 }

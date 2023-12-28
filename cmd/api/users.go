@@ -7,7 +7,6 @@ import (
 
 	"github.com/toduluz/savingsquadsbackend/internal/data"
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -170,11 +169,6 @@ func (app *application) logoutUserHandler(w http.ResponseWriter, r *http.Request
 func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract the user from the request context.
 	user := app.contextGetUser(r)
-	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
 
 	var voucherCodes []string
 	for code := range user.Vouchers {
@@ -185,7 +179,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 	if len(voucherCodes) > 0 {
 
 		// Get the details of the vouchers
-		vouchersWithDetails, err = app.models.Vouchers.GetVoucherList(voucherCodes)
+		vouchersfromModel, err := app.models.Vouchers.GetVoucherList(voucherCodes)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
@@ -195,6 +189,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 			}
 			return
 		}
+		vouchersWithDetails = vouchersfromModel
 	}
 
 	var vouchersWithDetailsAndCount []struct {
@@ -242,7 +237,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	// Update the user's voucher list
-	err = app.models.Users.UpdateVoucherList(id, user.Vouchers)
+	err := app.models.Users.UpdateVoucherList(user.ID, user.Vouchers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -258,12 +253,8 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 
 func (app *application) getUserPointsHandler(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
-	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
-	points, err := app.models.Users.GetPoints(id)
+
+	points, err := app.models.Users.GetPoints(user.ID)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -282,23 +273,18 @@ func (app *application) getUserPointsHandler(w http.ResponseWriter, r *http.Requ
 func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
-	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
 
 	var input struct {
 		Points int `json:"points"`
 	}
 
-	err = app.readJSON(w, r, &input)
+	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	err = app.models.Users.AddPoints(id, input.Points)
+	err = app.models.Users.AddPoints(user.ID, input.Points)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -312,11 +298,6 @@ func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Requ
 
 func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
-	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
 
 	var input struct {
 		Points       int    `json:"points"`
@@ -327,7 +308,7 @@ func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r
 		Category     string `json:"category"`
 	}
 
-	err = app.readJSON(w, r, &input)
+	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
@@ -360,7 +341,7 @@ func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r
 		return
 	}
 
-	err = app.models.Users.DeductPointsAndCreateVoucher(id, input.Points, &voucher)
+	err = app.models.Users.DeductPointsAndCreateVoucher(user.ID, input.Points, &voucher)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrVoucherAlreadyExists):
@@ -384,11 +365,6 @@ func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r
 func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
-	id, err := primitive.ObjectIDFromHex(user.ID.Hex())
-	if err != nil {
-		app.badRequestResponse(w, r, err)
-		return
-	}
 
 	code := app.readIDParam(r)
 
@@ -408,7 +384,7 @@ func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = app.models.Users.RedeemVoucher(id, voucher.Code, 1)
+	err = app.models.Users.RedeemVoucher(user.ID, voucher.Code, 1)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrVoucherAlreadyRedeeemed):

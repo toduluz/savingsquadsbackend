@@ -7,7 +7,6 @@ import (
 
 	"github.com/toduluz/savingsquadsbackend/internal/cookies"
 	"github.com/toduluz/savingsquadsbackend/internal/data"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // recoverPanic is middleware that recovers from a panic by responding with a 500 Internal Server
@@ -36,7 +35,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	})
 }
 
-func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+func (app *application) requireAuthenticatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Use the contextGetUser() helper that we made earlier to retrieve the user
 		// information from the request context.
@@ -105,13 +104,8 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		// 	app.invalidAuthenticationTokenResponse(w, r)
 		// 	return
 		// }
-		id, err := primitive.ObjectIDFromHex(claims.Subject)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
 		// Lookup the user record from the database.
-		user, err := app.models.Users.Get(id)
+		user, err := app.models.Users.Get(claims.Subject)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):

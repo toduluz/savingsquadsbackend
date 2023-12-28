@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -18,8 +19,25 @@ var (
 
 // Models struct is a single convenient container to hold and represent all our database models.
 type Models struct {
-	Vouchers VoucherModel
-	Users    UserModel
+	Vouchers interface {
+		Insert(voucher *Voucher) error
+		Get(string) (*Voucher, error)
+		GetVoucherList([]string) ([]Voucher, error)
+		UpdateUsageCount(string) error
+		Delete(string) error
+		GetAllVouchers(string, time.Time, time.Time, bool, int, string, *Filters) ([]Voucher, *Metadata, error)
+	}
+	Users interface {
+		Insert(user *User) (string, error)
+		Get(string) (*User, error)
+		GetByEmail(string) (*User, error)
+		GetAllVouchers(string) (map[string]int, error)
+		RedeemVoucher(string, string, int) error
+		GetPoints(string) (int, error)
+		AddPoints(string, int) error
+		DeductPointsAndCreateVoucher(string, int, *Voucher) error
+		UpdateVoucherList(string, map[string]int) error
+	}
 }
 
 func NewModels(db *mongo.Database) Models {
@@ -36,5 +54,12 @@ func NewModels(db *mongo.Database) Models {
 			InfoLog:  infoLog,
 			ErrorLog: errorLog,
 		},
+	}
+}
+
+func NewMockModels() Models {
+	return Models{
+		Vouchers: MockVoucherModel{},
+		Users:    MockUserModel{},
 	}
 }
