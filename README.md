@@ -41,8 +41,9 @@ To use these commands, navigate to the project directory in your terminal and ty
 - `GET /v1/users/vouchers/best`: (TODO) Get the best voucher for a user. Requires authentication.
 
 ## To do list
-1. Calculation service
+1. Integrate calculation service
 2. User - get best voucher 
 3. Touch up on admin (if necessary)
-4. ?Migration for mongodb
-6. ?Testing
+4. To complete unit test for handler, unit test for data layer, unit test for middleware, integration and end-to-end testing - using docker and docker-compose
+5. Explore additional features
+6. Explore go swagger for documenting API
