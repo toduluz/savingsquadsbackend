@@ -7,6 +7,12 @@ build:
 run: build
 	./bin/$(IMAGE_NAME)
 
+test-unit-handler:
+	@go test -v ./cmd/api/...
+
+test-unit-data:
+	docker-compose up --abort-on-container-exit
+
 docker-build:
 	docker build -t $(IMAGE_NAME) .
 
@@ -19,4 +25,4 @@ docker-stop:
 docker-clean: docker-stop
 	docker rm $(CONTAINER_NAME)
 
-.PHONY: build run docker-build docker-run docker-stop docker-clean
+.PHONY: build run docker-build docker-run docker-stop docker-clean test-unit-data test-unit-handler
