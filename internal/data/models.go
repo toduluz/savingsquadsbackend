@@ -2,6 +2,7 @@ package data
 
 import (
 	"errors"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -61,5 +62,22 @@ func NewMockModels() Models {
 	return Models{
 		Vouchers: MockVoucherModel{},
 		Users:    MockUserModel{},
+	}
+}
+
+func NewTestModels(db *mongo.Database) Models {
+	infoLog := log.New(io.Discard, "INFO\t", log.Ldate|log.Ltime)
+	errorLog := log.New(io.Discard, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	return Models{
+		Vouchers: VoucherModel{
+			DB:       db,
+			InfoLog:  infoLog,
+			ErrorLog: errorLog,
+		},
+		Users: UserModel{
+			DB:       db,
+			InfoLog:  infoLog,
+			ErrorLog: errorLog,
+		},
 	}
 }

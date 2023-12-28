@@ -1,0 +1,16 @@
+version: '3'
+services:
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+  go:
+    image: golang:1.21
+    volumes:
+      - .:/go/src/app
+    working_dir: /go/src/app
+    command: go test ./internal/data/... -v
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
