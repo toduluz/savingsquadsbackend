@@ -28,4 +28,4 @@
 3. Touch up on admin (if necessary)
 4. To complete unit test for handler, unit test for data layer, unit test for middleware, integration and end-to-end testing - using docker and docker-compose
 5. Explore additional features
-6. Explore go swagger for documenting API
+6. **Explore go swagger for documenting API**
