@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -59,15 +59,14 @@ func TestRegisterUserHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(tt.userJSON))
+			req, err := http.NewRequest(http.MethodPost, "/v1/user/register", bytes.NewBufferString(tt.userJSON))
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			rr := httptest.NewRecorder()
-			// handler := http.HandlerFunc(app.registerUserHandler)
-			router := app.routes()
-			router.ServeHTTP(rr, req)
+			handler := http.HandlerFunc(app.registerUserHandler)
+			handler.ServeHTTP(rr, req)
 
 			if status := rr.Code; status != tt.wantCode {
 				t.Errorf("handler returned wrong status code: got %v want %v",

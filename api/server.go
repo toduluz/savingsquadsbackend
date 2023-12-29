@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"context"
@@ -8,16 +8,29 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
+
+	"github.com/toduluz/savingsquadsbackend/internal/data"
+	"github.com/toduluz/savingsquadsbackend/internal/jsonlog"
 )
 
-func (app *application) serve() error {
+// Define an application struct to hold dependencies for our HTTP handlers, helpers, and
+// middleware.
+type Application struct {
+	Config Config
+	Logger *jsonlog.Logger
+	Models data.Models
+	Wg     sync.WaitGroup
+}
+
+func (app *Application) Serve() error {
 	// Declare an HTTP server using the same settings as in our main() function.
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.config.port),
-		Handler:      app.routes(),
-		ErrorLog:     log.New(app.logger, "", 0),
+		Addr:         fmt.Sprintf(":%d", app.Config.Port),
+		Handler:      app.Routes(),
+		ErrorLog:     log.New(app.Logger, "", 0),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -32,7 +45,7 @@ func (app *application) serve() error {
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		s := <-quit
 		// Update the log entry to say "shutting down server" instead of "caught signal".
-		app.logger.PrintInfo("shutting down server", map[string]string{
+		app.Logger.PrintInfo("shutting down server", map[string]string{
 
 			"signal": s.String(),
 		})
@@ -46,9 +59,9 @@ func (app *application) serve() error {
 		// hit). We relay this return value to the shutdownError channel.
 		shutdownError <- srv.Shutdown(ctx)
 	}()
-	app.logger.PrintInfo("starting server", map[string]string{
+	app.Logger.PrintInfo("starting server", map[string]string{
 		"addr": srv.Addr,
-		"env":  app.config.env,
+		"env":  app.Config.Env,
 	})
 	// Calling Shutdown() on our server will cause ListenAndServe() to immediately
 	// return a http.ErrServerClosed error. So if we see this error, it is actually a
@@ -67,7 +80,7 @@ func (app *application) serve() error {
 	}
 	// At this point we know that the graceful shutdown completed successfully and we
 	// log a "stopped server" message.
-	app.logger.PrintInfo("stopped server", map[string]string{
+	app.Logger.PrintInfo("stopped server", map[string]string{
 		"addr": srv.Addr,
 	})
 	return nil

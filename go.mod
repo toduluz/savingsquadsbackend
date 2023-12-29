@@ -4,7 +4,6 @@ go 1.21.4
 
 require (
 	github.com/gorilla/mux v1.8.1
-	github.com/joho/godotenv v1.5.1
 	github.com/pascaldekloe/jwt v1.12.0
 	go.mongodb.org/mongo-driver v1.13.1
 	golang.org/x/crypto v0.16.0

@@ -13,7 +13,7 @@ func newTestDB(t *testing.T) (*mongo.Database, func()) {
 	t.Helper()
 
 	// Get the MongoDB URI from the environment variable.
-	mongoURI := os.Getenv("MONGO_URI")
+	mongoURI := os.Getenv("MONGOURILOCAL")
 	if mongoURI == "" {
 		t.Fatal("MONGO_URI not set")
 	}
@@ -30,6 +30,10 @@ func newTestDB(t *testing.T) (*mongo.Database, func()) {
 	// Return the database handle and a function to close it.
 	return db, func() {
 		err := db.Drop(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = client.Disconnect(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

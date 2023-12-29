@@ -1,0 +1,12 @@
+version: '3'
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    command: ["go", "test", "./api/...", "-v"]
+    volumes:
+      - unit_test_volume:/app
+
+volumes:
+  unit_test_volume:

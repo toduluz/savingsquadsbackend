@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ import (
 type envelope map[string]interface{}
 
 // readIDParam reads interpolated "id" from request URL and returns it as a string.
-func (app *application) readIDParam(r *http.Request) string {
+func (app *Application) readIDParam(r *http.Request) string {
 	// params := httprouter.ParamsFromContext(r.Context())
 
 	// param := params.ByName("id")
@@ -31,7 +31,7 @@ func (app *application) readIDParam(r *http.Request) string {
 
 // writeJSON marshals data structure to encoded JSON response. It returns an error if there are
 // any issues, else error is nil.
-func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope,
+func (app *Application) writeJSON(w http.ResponseWriter, status int, data envelope,
 	headers http.Header) error {
 	// Use the json.MarshalIndent() function so that whitespace is added to the encoded JSON. Use
 	// no line prefix and tab indents for each element.
@@ -51,11 +51,11 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 		w.Header()[key] = value
 	}
 
-	// Add the "Content-Type: application/json" header, then write the status code and JSON response.
-	w.Header().Set("Content-Type", "application/json")
+	// Add the "Content-Type: Application/json" header, then write the status code and JSON response.
+	w.Header().Set("Content-Type", "Application/json")
 	w.WriteHeader(status)
 	if _, err := w.Write(js); err != nil {
-		app.logger.PrintError(err, nil)
+		app.Logger.PrintError(err, nil)
 		return err
 	}
 
@@ -64,7 +64,7 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 
 // readJSON decodes request Body into corresponding Go type. It triages for any potential errors
 // and returns corresponding appropriate errors.
-func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst interface{}) error {
+func (app *Application) readJSON(w http.ResponseWriter, r *http.Request, dst interface{}) error {
 	// Use http.MaxBytesReader() to limit the size of the request body to 1MB to prevent
 	// any potential nefarious DoS attacks.
 	maxBytes := 1_048_576
@@ -158,9 +158,9 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 	return nil
 }
 
-// readString is a helper method on application type that returns a string value from the URL query
+// readString is a helper method on Application type that returns a string value from the URL query
 // string, or the provided default value if no matching key is found.
-func (app *application) readStrings(qs url.Values, key string, defaultValue string) string {
+func (app *Application) readStrings(qs url.Values, key string, defaultValue string) string {
 	// Extract the value for a given key from the URL query string.
 	// If no key exists this will return an empty string "".
 	s := qs.Get(key)
@@ -174,9 +174,9 @@ func (app *application) readStrings(qs url.Values, key string, defaultValue stri
 	return s
 }
 
-// readBool is a helper method on application type that returns a boolean value from the URL query
+// readBool is a helper method on Application type that returns a boolean value from the URL query
 // string, or the provided default value if no matching key is found.
-func (app *application) readBool(qs url.Values, key string, defaultValue bool) bool {
+func (app *Application) readBool(qs url.Values, key string, defaultValue bool) bool {
 	// Extract the value from the URL query string
 	s := qs.Get(key)
 
@@ -194,9 +194,9 @@ func (app *application) readBool(qs url.Values, key string, defaultValue bool) b
 	return b
 }
 
-// readTime is a helper method on application type that returns a time.Time value from the URL query
+// readTime is a helper method on Application type that returns a time.Time value from the URL query
 // string, or the provided default value if no matching key is found.
-func (app *application) readTime(qs url.Values, key string, defaultValue time.Time) time.Time {
+func (app *Application) readTime(qs url.Values, key string, defaultValue time.Time) time.Time {
 	// Extract the value from the URL query string
 	s := qs.Get(key)
 
@@ -215,10 +215,10 @@ func (app *application) readTime(qs url.Values, key string, defaultValue time.Ti
 	return t
 }
 
-// readCSV is a helper method on application type that reads a string value from the URL query
+// readCSV is a helper method on Application type that reads a string value from the URL query
 // string and then splits it into a slice on the comma character. If no matching key is found
 // then it returns the provided default value.
-func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+func (app *Application) readCSV(qs url.Values, key string, defaultValue []string) []string {
 	// Extract the value from the URL query string
 	csv := qs.Get(key)
 
@@ -231,11 +231,11 @@ func (app *application) readCSV(qs url.Values, key string, defaultValue []string
 	return strings.Split(csv, ",")
 }
 
-// readInt is a helper method on application type that reads a string value from the URL query
+// readInt is a helper method on Application type that reads a string value from the URL query
 // string and converts it to an integer before returning. If no matching key is found then it
 // returns the provided default value. If the value couldn't be converted to an integer, then we
 // record an error message in the provided Validator instance, and return the default value.
-func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+func (app *Application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
 	// Extract the value from the URL query string.
 	s := qs.Get(key)
 
@@ -258,18 +258,18 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 
 // background is a helper that accepts an arbitrary function as a parameter and runs it in a
 // in goroutine in the background.
-func (app *application) background(fn func()) {
+func (app *Application) background(fn func()) {
 	// Increment the WaitGroup counter
-	app.wg.Add(1)
+	app.Wg.Add(1)
 
 	go func() {
 		// Use defer to decrement the WaitGroup counter before the goroutine returns.
-		defer app.wg.Done()
+		defer app.Wg.Done()
 
 		// Recover from any panic
 		defer func() {
 			if err := recover(); err != nil {
-				app.logger.PrintError(fmt.Errorf("%s", err), nil)
+				app.Logger.PrintError(fmt.Errorf("%s", err), nil)
 			}
 		}()
 

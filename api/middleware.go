@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 // recoverPanic is middleware that recovers from a panic by responding with a 500 Internal Server
 // Error before closing the connection. It will also log the error using our custom Logger at
 // the ERROR level.
-func (app *application) recoverPanic(next http.Handler) http.Handler {
+func (app *Application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Create a deferred function (which will always be run in the event of a panic as
 		// Go unwinds the stack).
@@ -35,7 +35,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	})
 }
 
-func (app *application) requireAuthenticatedUser(next http.Handler) http.Handler {
+func (app *Application) requireAuthenticatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Use the contextGetUser() helper that we made earlier to retrieve the user
 		// information from the request context.
@@ -57,7 +57,7 @@ func (app *application) requireAuthenticatedUser(next http.Handler) http.Handler
 	})
 }
 
-func (app *application) authenticate(next http.Handler) http.Handler {
+func (app *Application) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		token, err := app.getCookie(r, "jwt")
@@ -69,7 +69,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 			case errors.Is(err, cookies.ErrInvalidValue):
 				app.invalidAuthenticationTokenResponse(w, r)
 			default:
-				app.logger.PrintError(err, nil)
+				app.Logger.PrintError(err, nil)
 				app.serverErrorResponse(w, r, err)
 			}
 			return
@@ -94,18 +94,18 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
-		// // Check that the issuer is our application.
+		// // Check that the issuer is our Application.
 		// if claims.Issuer != "" {
 		// 	app.invalidAuthenticationTokenResponse(w, r)
 		// 	return
 		// }
-		// // Check that our application is in the expected audiences for the JWT.
+		// // Check that our Application is in the expected audiences for the JWT.
 		// if !claims.AcceptAudience("") {
 		// 	app.invalidAuthenticationTokenResponse(w, r)
 		// 	return
 		// }
 		// Lookup the user record from the database.
-		user, err := app.models.Users.Get(claims.Subject)
+		user, err := app.Models.Users.Get(claims.Subject)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
@@ -123,7 +123,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 // enableCORS sets the Vary: Origin and Access-Control-Allow-Origin response headers in order to
 // enabled CORS for trusted origins.
-func (app *application) enableCORS(next http.Handler) http.Handler {
+func (app *Application) enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Add the "Vary: Origin" header.
 		w.Header().Set("Vary", "Origin")
@@ -139,8 +139,8 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 			// Loop through the list of trusted origins, checking to see if the request
 			// origin exactly matches one of them. If there are no trusted origins, then the
 			// loop won't be iterated.
-			for i := range app.config.cors.trustedOrigins {
-				if origin == app.config.cors.trustedOrigins[i] {
+			for i := range app.Config.Cors.TrustedOrigins {
+				if origin == app.Config.Cors.TrustedOrigins[i] {
 					// If there is a match, then set an "Access-Control-Allow-Origin" response
 					// header with the request origin as the value and break out of the loop.
 					w.Header().Set("Access-Control-Allow-Origin", origin)

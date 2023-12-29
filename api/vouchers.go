@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 )
 
-func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) createVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	// Declare an anonymous struct to hold the information that we expect to be in the HTTP
 	// request body (not that the field names and types in the struct are a subset of the Movie
 	// struct). This struct will be our *target decode destination*.
@@ -80,7 +80,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 	// Call the Insert() method on our vouchers model, passing in a pointer to the validated voucher
 	// struct. This will create a record in the database and update the voucher struct with the
 	// system-generated information.
-	err = app.models.Vouchers.Insert(voucher)
+	err = app.Models.Vouchers.Insert(voucher)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -104,7 +104,7 @@ func (app *application) createVoucherHandler(w http.ResponseWriter, r *http.Requ
 // showMovieHandler handles the "GET /v1/vouchers/{id}" endpoint and returns a JSON response of the
 // requested voucher record. If there is an error a JSON formatted error is
 // returned.
-func (app *application) showVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) showVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	// When httprouter is parsing a request, any interpolated URL Parameters will be stored
 	// in the request context. We can use the ParamsFromContext() function to retrieve a slice
 	// containing these parameter names and values.
@@ -114,7 +114,7 @@ func (app *application) showVoucherHandler(w http.ResponseWriter, r *http.Reques
 	// We also need to use the errors.Is()
 	// function to check if it returns a data.ErrRecordNotFound error,
 	// in which case we send a 404 Not Found response to the client.
-	voucher, err := app.models.Vouchers.Get(code)
+	voucher, err := app.Models.Vouchers.Get(code)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -136,13 +136,13 @@ func (app *application) showVoucherHandler(w http.ResponseWriter, r *http.Reques
 // deleteVoucherHandler handles "DELETE /v1/vouchers/{id}" endpoint and returns a 200 OK status code
 // with a success message in a JSON response. If there is an error a JSON formatted error is
 // returned.
-func (app *application) deleteVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) deleteVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract the movie ID from the URL.
 	code := app.readIDParam(r)
 
 	// Delete the voucher from the database. Send a 404 Not Found response to the client if
 	// there isn't a matching record.
-	err := app.models.Vouchers.Delete(code)
+	err := app.Models.Vouchers.Delete(code)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -160,7 +160,7 @@ func (app *application) deleteVoucherHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) listVouchersHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Code         string
 		Starts       time.Time
@@ -214,7 +214,7 @@ func (app *application) listVouchersHandler(w http.ResponseWriter, r *http.Reque
 
 	// Call the MovieModel.GetAll method to retrieve the movies, passing in the various filter
 	// parameters.
-	vouchers, metadata, err := app.models.Vouchers.GetAllVouchers(input.Code, input.Starts, input.Expires, input.Active, input.MinSpend, input.Category, &input.Filters)
+	vouchers, metadata, err := app.Models.Vouchers.GetAllVouchers(input.Code, input.Starts, input.Expires, input.Active, input.MinSpend, input.Category, &input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -6,8 +6,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// routes is our main application's router.
-func (app *application) routes() http.Handler {
+// routes is our main Application's router.
+func (app *Application) Routes() http.Handler {
 	router := mux.NewRouter()
 	router.Use(app.recoverPanic)
 	router.Use(app.enableCORS)

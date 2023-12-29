@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"github.com/toduluz/savingsquadsbackend/internal/validator"
 )
 
-func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	// Create an anonymous struct to hold the expected data from the request body.
 	var input struct {
 		Name     string `json:"name"`
@@ -58,7 +58,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Insert the user data into the database.
-	id, err := app.models.Users.Insert(user)
+	id, err := app.Models.Users.Insert(user)
 	if err != nil {
 		switch {
 		// If we get an ErrDuplicateEmail error, use the v.AddError() method to manually add
@@ -95,7 +95,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) loginUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -112,7 +112,7 @@ func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request)
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
-	user, err := app.models.Users.GetByEmail(input.Email)
+	user, err := app.Models.Users.GetByEmail(input.Email)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -151,7 +151,7 @@ func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (app *application) logoutUserHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) logoutUserHandler(w http.ResponseWriter, r *http.Request) {
 	// Set the value of the "jwt" cookie to the empty string.
 	err := app.setCookie(w, "jwt", "", -1)
 	if err != nil {
@@ -166,7 +166,7 @@ func (app *application) logoutUserHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) getUserVouchersHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract the user from the request context.
 	user := app.contextGetUser(r)
 
@@ -179,7 +179,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 	if len(voucherCodes) > 0 {
 
 		// Get the details of the vouchers
-		vouchersfromModel, err := app.models.Vouchers.GetVoucherList(voucherCodes)
+		vouchersfromModel, err := app.Models.Vouchers.GetVoucherList(voucherCodes)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
@@ -237,7 +237,7 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	// Update the user's voucher list
-	err := app.models.Users.UpdateVoucherList(user.ID, user.Vouchers)
+	err := app.Models.Users.UpdateVoucherList(user.ID, user.Vouchers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -251,10 +251,10 @@ func (app *application) getUserVouchersHandler(w http.ResponseWriter, r *http.Re
 
 }
 
-func (app *application) getUserPointsHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) getUserPointsHandler(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
 
-	points, err := app.models.Users.GetPoints(user.ID)
+	points, err := app.Models.Users.GetPoints(user.ID)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -270,7 +270,7 @@ func (app *application) getUserPointsHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) addUserPointsHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
 
@@ -284,7 +284,7 @@ func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = app.models.Users.AddPoints(user.ID, input.Points)
+	err = app.Models.Users.AddPoints(user.ID, input.Points)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -296,7 +296,7 @@ func (app *application) addUserPointsHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) exchangePointsForVoucherHandler(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
 
 	var input struct {
@@ -341,7 +341,7 @@ func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r
 		return
 	}
 
-	err = app.models.Users.DeductPointsAndCreateVoucher(user.ID, input.Points, &voucher)
+	err = app.Models.Users.DeductPointsAndCreateVoucher(user.ID, input.Points, &voucher)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrVoucherAlreadyExists):
@@ -362,13 +362,13 @@ func (app *application) exchangePointsForVoucherHandler(w http.ResponseWriter, r
 
 }
 
-func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
 
 	code := app.readIDParam(r)
 
-	voucher, err := app.models.Vouchers.Get(code)
+	voucher, err := app.Models.Vouchers.Get(code)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -384,7 +384,7 @@ func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = app.models.Users.RedeemVoucher(user.ID, voucher.Code, 1)
+	err = app.Models.Users.RedeemVoucher(user.ID, voucher.Code, 1)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrVoucherAlreadyRedeeemed):
@@ -401,7 +401,7 @@ func (app *application) redeemUserVoucherHandler(w http.ResponseWriter, r *http.
 	}
 }
 
-func (app *application) useUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Application) useUserVoucherHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
 
@@ -410,12 +410,12 @@ func (app *application) useUserVoucherHandler(w http.ResponseWriter, r *http.Req
 	if voucherCount, ok := user.Vouchers[voucherCode]; ok {
 		if voucherCount > 0 {
 			user.Vouchers[voucherCode]--
-			err := app.models.Users.UpdateVoucherList(user.ID, user.Vouchers)
+			err := app.Models.Users.UpdateVoucherList(user.ID, user.Vouchers)
 			if err != nil {
 				app.serverErrorResponse(w, r, err)
 				return
 			}
-			err = app.models.Vouchers.UpdateUsageCount(voucherCode)
+			err = app.Models.Vouchers.UpdateUsageCount(voucherCode)
 			if err != nil {
 				switch {
 				case errors.Is(err, data.ErrRecordNotFound):

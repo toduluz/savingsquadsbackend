@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"errors"
@@ -8,10 +8,10 @@ import (
 	"github.com/toduluz/savingsquadsbackend/internal/data"
 )
 
-func (app *application) createJWTClaims(user *data.User) ([]byte, error) {
+func (app *Application) createJWTClaims(user *data.User) ([]byte, error) {
 	// Create a JWT claims struct containing the user ID as the subject, with an issued
 	// time of now and validity window of the next 24 hours. We also set the issuer and
-	// audience to a unique identifier for our application.
+	// audience to a unique identifier for our Application.
 	var claims jwt.Claims
 	claims.Subject = user.ID
 	claims.Issued = jwt.NewNumericTime(time.Now())
@@ -22,20 +22,20 @@ func (app *application) createJWTClaims(user *data.User) ([]byte, error) {
 	claims.Set = map[string]interface{}{"version": user.Version}
 
 	// Sign the JWT claims using the HMAC-SHA256 algorithm and the secret key from the
-	// application config. This returns a []byte slice containing the JWT as a base64-
+	// Application Config. This returns a []byte slice containing the JWT as a base64-
 	// encoded string.
-	jwtBytes, err := claims.HMACSign(jwt.HS256, []byte(app.config.jwt.secret))
+	jwtBytes, err := claims.HMACSign(jwt.HS256, []byte(app.Config.Jwt.Secret))
 	if err != nil {
 		return nil, err
 	}
 	return jwtBytes, nil
 }
 
-func (app *application) validateJWTClaims(token string) (*jwt.Claims, error) {
+func (app *Application) validateJWTClaims(token string) (*jwt.Claims, error) {
 	// Parse the JWT and extract the claims. This will return an error if the JWT
 	// contents doesn't match the signature (i.e. the token has been tampered with)
 	// or the algorithm isn't valid.
-	claims, err := jwt.HMACCheck([]byte(token), []byte(app.config.jwt.secret))
+	claims, err := jwt.HMACCheck([]byte(token), []byte(app.Config.Jwt.Secret))
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -6,7 +6,7 @@ import (
 	"github.com/toduluz/savingsquadsbackend/internal/cookies"
 )
 
-func (app *application) setCookie(w http.ResponseWriter, name, value string, maxAge int) error {
+func (app *Application) setCookie(w http.ResponseWriter, name, value string, maxAge int) error {
 	cookie := http.Cookie{
 		Name:     name,
 		Value:    value,
@@ -19,17 +19,17 @@ func (app *application) setCookie(w http.ResponseWriter, name, value string, max
 
 	// Use the WriteSigned() function, passing in the secret key as the final
 	// argument.
-	err := cookies.WriteSigned(w, cookie, []byte(app.config.jwt.secret))
+	err := cookies.WriteSigned(w, cookie, []byte(app.Config.Jwt.Secret))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (app *application) getCookie(r *http.Request, value string) (string, error) {
+func (app *Application) getCookie(r *http.Request, value string) (string, error) {
 	// Use the ReadSigned() function, passing in the secret key as the final
 	// argument.
-	value, err := cookies.ReadSigned(r, value, []byte(app.config.jwt.secret))
+	value, err := cookies.ReadSigned(r, value, []byte(app.Config.Jwt.Secret))
 	if err != nil {
 		return "", err
 	}

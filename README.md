@@ -1,23 +1,5 @@
 # savingsquadsbackend Capstone
 
-## Makefile Usage
-
-The Makefile included in this project simplifies some of the tasks related to building and running the application. Here's how to use it:
-
-- `make build`: This command compiles the Go application and outputs the binary to the `bin/` directory.
-
-- `make run`: This command first builds the application using the `build` target, then runs the compiled binary.
-
-- `make docker-build`: This command builds a Docker image of your application. It uses the Dockerfile in the current directory and tags the image with the name `savingsquadsbackend`.
-
-- `make docker-run`: This command first builds the Docker image using the `docker-build` target, then runs the Docker image as a container. The container listens on port 3000.
-
-- `make docker-stop`: This command stops the running Docker container.
-
-- `make docker-clean`: This command first stops the running Docker container using the `docker-stop` target, then removes the Docker container.
-
-To use these commands, navigate to the project directory in your terminal and type the command you want to run. For example, to build and run the Docker container, you would type `make docker-run`.
-
 ## Routes
 
 ### Admin Routes
